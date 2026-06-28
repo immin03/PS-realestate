@@ -1,0 +1,2494 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHAMA SQUARE | 출점 입지 분석 리포트</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --ink:#111111; --paper:#FFFFFF; --red:#C8102E; --peach:#FBE9DD;
+    --gray:#7A7A7A; --hairline:#DADAD5; --teal:#1D9E75; --amber:#B97515;
+    --wash:#F4F3EF; --ok:#0F6E56; --warn:#A32D2D;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:"Pretendard",-apple-system,sans-serif; background:var(--wash); color:var(--ink);
+        font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased; }
+
+  /* ===== Toolbar (screen only) ===== */
+  .toolbar{ max-width:900px; margin:0 auto; padding:20px 16px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar input[type=text]{ flex:1; min-width:240px; height:42px; border:1px solid var(--hairline); border-radius:8px;
+        padding:0 14px; font-size:14px; font-family:inherit; background:var(--paper); }
+  .toolbar input[type=text]:focus{ outline:none; border-color:var(--ink); }
+  .btn{ height:42px; padding:0 18px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff;
+        font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .btn.ghost{ background:var(--paper); color:var(--ink); border-color:var(--hairline); font-weight:500; }
+  .btn:active{ transform:scale(0.98); }
+  .mode{ display:flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--paper); }
+  .mode button{ border:none; background:transparent; padding:0 14px; height:40px; font-size:13px; cursor:pointer; font-family:inherit; color:var(--gray); }
+  .mode button.on{ background:var(--ink); color:#fff; }
+  .demo-note{ max-width:900px; margin:8px auto 0; padding:0 16px; font-size:12px; color:var(--gray); }
+  .demo-note b{ color:var(--red); font-weight:600; }
+
+  /* ===== Report sheet ===== */
+  .sheet{ max-width:900px; margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
+          padding:56px 64px 48px; }
+  @media (max-width:720px){ .sheet{ padding:32px 20px; } }
+
+  .letterhead{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
+  .wordmark{ font-weight:700; letter-spacing:0.42em; font-size:17px; }
+  .confidential{ color:var(--red); font-style:italic; font-size:12px; }
+  .doc-title{ margin-top:34px; }
+  .doc-title .eyebrow{ font-style:italic; color:var(--gray); font-size:12.5px; letter-spacing:0.04em; }
+  .doc-title h1{ font-size:27px; font-weight:700; letter-spacing:-0.01em; margin-top:2px; }
+  .doc-sub{ font-size:13.5px; color:#444; margin-top:8px; }
+  .doc-meta{ display:flex; gap:18px; flex-wrap:wrap; margin-top:12px; padding-bottom:18px; border-bottom:1.5px solid var(--ink);
+             font-size:13px; color:var(--gray); }
+  .doc-meta b{ color:var(--ink); font-weight:600; }
+
+  section{ margin-top:40px; page-break-inside:avoid; }
+  .sec-label{ font-style:italic; color:var(--gray); font-size:12px; letter-spacing:0.04em; }
+  .sec-title{ font-size:19px; font-weight:700; margin:2px 0 6px; }
+  .sec-lead{ font-size:13.5px; color:#444; padding-bottom:10px; border-bottom:1px solid var(--hairline); margin-bottom:18px; }
+
+  .badges{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px; }
+  .badge{ font-size:12.5px; padding:5px 14px; border:1px solid var(--ink); border-radius:999px; font-weight:600; }
+  .badge.soft{ border-color:var(--hairline); color:var(--gray); font-weight:500; }
+  .badge.alert{ border-color:var(--red); color:var(--red); }
+  .kv{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .kv td{ padding:9px 4px; border-bottom:1px solid var(--hairline); vertical-align:top; }
+  .kv td:first-child{ color:var(--gray); width:34%; }
+  .kv td:last-child{ font-weight:500; }
+
+  /* 단계 분석 */
+  .stages{ display:flex; flex-direction:column; gap:0; margin-top:4px; }
+  .stage{ display:grid; grid-template-columns:46px 1fr; gap:14px; padding:14px 0; border-bottom:1px solid var(--hairline); }
+  .stage:last-child{ border-bottom:none; }
+  .stage-no{ width:34px; height:34px; border:1.5px solid var(--ink); border-radius:50%; display:flex; align-items:center;
+             justify-content:center; font-weight:700; font-size:14px; }
+  .stage-t{ font-weight:700; font-size:14px; }
+  .stage-d{ font-size:13px; color:#444; margin-top:2px; }
+  .stage-d b{ font-weight:700; }
+
+  /* 종합 적합도 */
+  .verdict-wrap{ display:flex; gap:28px; align-items:center; flex-wrap:wrap; }
+  .seal{ width:124px; height:124px; border:3px solid var(--red); border-radius:50%; display:flex; flex-direction:column;
+         align-items:center; justify-content:center; color:var(--red); flex-shrink:0; transform:rotate(-4deg); }
+  .seal .g{ font-size:44px; font-weight:800; line-height:1; }
+  .seal .s{ font-size:12px; font-weight:700; letter-spacing:0.18em; margin-top:4px; }
+  .verdict-body{ flex:1; min-width:260px; }
+  .verdict-score{ font-size:15px; color:var(--gray); }
+  .verdict-score b{ font-size:34px; color:var(--ink); font-weight:800; letter-spacing:-0.02em; }
+  .verdict-line{ font-size:14.5px; font-weight:600; margin-top:2px; }
+  .bars{ margin-top:16px; }
+  .bar-row{ display:grid; grid-template-columns:170px 1fr 64px; gap:12px; align-items:center; padding:7px 0; }
+  @media (max-width:560px){ .bar-row{ grid-template-columns:130px 1fr 56px; } }
+  .bar-name{ font-size:13px; color:#444; }
+  .bar-track{ height:7px; background:var(--wash); border-radius:4px; overflow:hidden; }
+  .bar-fill{ height:100%; background:var(--ink); border-radius:4px; }
+  .bar-fill.warn{ background:var(--red); }
+  .bar-val{ font-size:13px; font-weight:600; text-align:right; font-variant-numeric:tabular-nums; }
+  .bar-val span{ color:var(--gray); font-weight:400; }
+  .score-note{ font-size:12px; color:var(--gray); margin-top:10px; }
+
+  /* 적합 포인트 체크리스트 */
+  .fit-list{ display:flex; flex-direction:column; }
+  .fit{ display:grid; grid-template-columns:30px 1fr; gap:12px; padding:11px 0; border-bottom:1px solid var(--hairline); align-items:start; }
+  .fit:last-child{ border-bottom:none; }
+  .fit-mark{ font-size:16px; font-weight:800; line-height:1.4; }
+  .fit-mark.ok{ color:var(--ok); } .fit-mark.cond{ color:var(--amber); } .fit-mark.no{ color:var(--warn); }
+  .fit-t{ font-weight:700; font-size:13.5px; }
+  .fit-d{ font-size:13px; color:#444; }
+
+  /* metric grid */
+  .grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .metric{ background:var(--wash); border-radius:8px; padding:14px 16px; }
+  .metric .l{ font-size:12px; color:var(--gray); }
+  .metric .v{ font-size:21px; font-weight:700; margin-top:2px; font-variant-numeric:tabular-nums; letter-spacing:-0.01em; }
+  .metric .d{ font-size:11.5px; color:var(--gray); margin-top:1px; }
+  .metric.hl{ background:var(--peach); }
+
+  /* map */
+  .map-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px; }
+  .radius-toggle{ display:flex; gap:4px; }
+  .radius-toggle button{ font-size:12px; padding:4px 12px; border:1px solid var(--hairline); background:var(--paper);
+        border-radius:999px; cursor:pointer; font-family:inherit; color:var(--gray); }
+  .radius-toggle button.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
+  #map{ width:100%; height:340px; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--wash); }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#444; }
+  .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .legend b{ font-weight:700; font-variant-numeric:tabular-nums; }
+
+  /* price table */
+  .tbl{ width:100%; border-collapse:collapse; font-size:13px; }
+  .tbl th{ text-align:left; font-weight:600; font-size:12px; color:var(--gray); padding:8px 6px; border-bottom:1.5px solid var(--ink); }
+  .tbl td{ padding:9px 6px; border-bottom:1px solid var(--hairline); font-variant-numeric:tabular-nums; }
+  .tbl .num{ text-align:right; }
+
+  .opinion{ background:var(--wash); border-left:3px solid var(--red); padding:16px 20px; font-size:13.5px; line-height:1.85; }
+  .opinion[contenteditable]:focus{ outline:1.5px solid var(--red); }
+  .edit-hint{ font-size:11.5px; color:var(--gray); margin-top:6px; }
+
+  body.external .internal-only{ display:none !important; }
+  .footer{ margin-top:48px; padding-top:14px; border-top:1px solid var(--hairline); font-size:10.5px; color:var(--gray); line-height:1.7; }
+  .footer .ftr-row{ display:flex; justify-content:space-between; margin-top:10px; font-size:11px; }
+
+@page {
+  margin: 14mm 12mm 18mm 12mm;
+  @bottom-center {
+    content: counter(page);
+    font-size: 10px;
+    color: #777;
+  }
+}
+
+  @media print{
+    body{ background:#fff; }
+    #gate,.toolbar,.demo-note,.edit-hint,.radius-toggle{ display:none !important; }
+    .sheet{ border:none; margin:0; max-width:none; padding:24px 8px; }
+    section{ margin-top:28px; }
+    #map{ height:300px; }
+  }
+</style>
+<script src="config.js"></script>
+<script src="config.local.js" onerror="window.APP_CONFIG_LOCAL=window.APP_CONFIG_LOCAL||{}"></script>
+<script src="vworld.config.js" onerror="window.APP_CONFIG_LOCAL=window.APP_CONFIG_LOCAL||{}"></script>
+</head>
+<body>
+
+<!-- config.js + config.local.js(.env에서 generate-config.js로 생성)에 키·접속코드를 설정합니다. -->
+<script>
+const CONFIG = {
+  ...window.APP_CONFIG,
+  ...(window.APP_CONFIG_LOCAL || {})
+};
+
+/* 건물 유형 프로파일 — 유형별 수요 특성·체크포인트·점수 보정 */
+const TYPE_PROFILES = {
+  "지식산업센터": {
+    factor: 0.85,
+    trait: "평일 주간 직장인 수요 중심. 입주율과 상주 인원이 매출을 좌우하며, 주말·야간 공백이 발생할 수 있어 주거 배후 보완이 필수입니다.",
+    stages: [
+      ["건물 자체 수요", d => `해당 건물 입주 <b>${d.inBldgUnits||"[확인 필요]"}</b> (기업·세대 합산), 입주율 <b>${d.occupancy!=null?d.occupancy+"%":"[확인 필요]"}</b>, 상주 인원 약 <b>${d.workers?fmt(d.workers)+"명":"[확인 필요]"}</b> — 분양 공실이 많은 지산은 표기 세대수와 실수요 격차가 크므로 입주율을 반드시 실사로 확인합니다.`],
+      ["인근 동종 시설", d => `반경 5km 내 지식산업센터 <b>${d.nearbySame!=null?d.nearbySame+"개동":"[확인 필요]"}</b> — 인근 지산 상주 인원이 평일 점심·퇴근 수요로 합산됩니다.`],
+      ["배후 주거 인구", d => `반경 5km 주거 <b>${fmt(d.households5km)}세대</b> — 주말·야간 매출을 받쳐줄 주거 배후 규모입니다.`]
+    ]
+  },
+  "복합상가": {
+    factor: 1.0,
+    trait: "키테넌트(마트·병원·영화관 등)와의 동반 집객이 핵심. 같은 건물 내 집객 시설 구성에 따라 유동이 크게 달라집니다.",
+    stages: [
+      ["건물 자체 집객", d => `건물 내 키테넌트: <b>${d.keyTenants||"[확인 필요]"}</b> — 동반 방문 수요가 매장 유입의 1차 동력입니다.`],
+      ["인근 동종 시설", d => `반경 5km 내 경합 복합상가 <b>${d.nearbySame!=null?d.nearbySame+"개":"[확인 필요]"}</b> — 상권 내 유동 분산 정도를 가늠합니다.`],
+      ["배후 주거 인구", d => `반경 5km 주거 <b>${fmt(d.households5km)}세대</b> — 반복 구매 고객의 기반입니다.`]
+    ]
+  },
+  "아파트 단지내 상가": {
+    factor: 0.9,
+    trait: "단지 고정 수요는 안정적이나 외부 유입이 제한적. 단지 세대수가 곧 시장 크기이며, 200평급 창고형 모델에는 면적 확보가 관건입니다.",
+    stages: [
+      ["단지 자체 수요", d => `해당 단지 <b>${d.inBldgUnits||"[확인 필요]"}세대</b> — 단지내 상가는 이 세대수가 사실상의 1차 상권입니다.`],
+      ["인근 단지", d => `도보권 인근 단지 합산 <b>${d.nearbySame!=null?fmt(d.nearbySame)+"세대":"[확인 필요]"}</b> — 도보 유입 가능 범위의 추가 수요입니다.`],
+      ["배후 주거 인구", d => `반경 5km 주거 <b>${fmt(d.households5km)}세대</b>.`]
+    ]
+  },
+  "근린상가": {
+    factor: 1.0,
+    trait: "주거지 인접 가로·근린 상권. 배후 세대 규모와 주차·접근성이 매출을 좌우하는, 창고형 모델의 표준 입지 유형입니다.",
+    stages: [
+      ["대상 건물 조건", d => `임대 전용면적 <b>확인 필요</b> · ${d.floor}, ${d.parking} — 건축물대장 기본정보는 확인되었으나, 실제 임대 전용면적은 임대 호실 및 계약조건 확인이 필요합니다.`],
+      ["인근 상권 구성", d => `${d.anchorSummary||"인근 집객 시설은 IV장 참조."}`],
+      ["배후 주거 인구", d => `반경 5km 주거 <b>${fmt(d.households5km)}세대</b> — 반복 방문 수요의 핵심 기반입니다.`]
+    ]
+  }
+};
+</script>
+
+<div id="gate" style="position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--paper); border:1px solid var(--hairline); padding:48px 40px; max-width:380px; width:100%; text-align:center;">
+    <div class="wordmark" style="font-size:15px;">PHAMA SQUARE</div>
+    <div class="confidential" style="margin-top:6px;">Strictly Private &amp; Confidential</div>
+    <p style="font-size:13.5px; color:#444; margin:24px 0 14px;">본 리포트는 관계자 전용 자료입니다.<br>전달받으신 접속 코드를 입력해 주세요.</p>
+    <input type="password" id="gateInput" placeholder="접속 코드" style="width:100%; height:44px; border:1px solid var(--hairline); border-radius:8px; padding:0 14px; font-size:14px; font-family:inherit; text-align:center;">
+    <button class="btn" id="gateBtn" style="width:100%; margin-top:10px;">확인</button>
+    <p id="gateErr" style="font-size:12px; color:var(--red); margin-top:10px; visibility:hidden;">접속 코드가 올바르지 않습니다.</p>
+  </div>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="addrInput" value="" placeholder="주소 입력 (도로명·지번)">
+  <button class="btn" id="runBtn">분석</button>
+  <div class="mode" title="가맹점주 제공용은 내부 메모가 숨겨집니다">
+    <button id="modeInternal" class="on">내부 검토용</button>
+    <button id="modeExternal">가맹점주 제공용</button>
+  </div>
+  <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
+</div>
+<p class="demo-note" id="demoNote">주소만 입력하고 <b>분석</b>을 누르면 건물 유형·임대료·주변 상권이 자동 분석됩니다.</p>
+
+<div class="sheet" id="report">
+
+  <div class="letterhead">
+    <div class="wordmark">PHAMA SQUARE</div>
+    <div class="confidential">Strictly Private &amp; Confidential</div>
+  </div>
+
+  <div class="doc-title">
+    <div class="eyebrow">Site Feasibility Report — for Prospective Partners</div>
+    <h1>출점 입지 분석 리포트</h1>
+    <div class="doc-sub">본 리포트는 예비 파트너님께서 검토 중인 입지가 창고형 웰니스 플랫폼 「파마스퀘어」 모델에 적합한지를, 본사 직영점 운영 데이터에 기반한 표준 평가 모델로 분석한 자료입니다.</div>
+  </div>
+  <div class="doc-meta">
+    <span>대상지 <b id="mAddr">—</b></span>
+    <span>작성일 <b id="mDate">—</b></span>
+    <span>작성 <b>파마스퀘어 출점전략팀</b></span>
+  </div>
+
+  <!-- I. 대상지 개요 + 유형별 단계 분석 -->
+  <section>
+    <div class="sec-label">I. Site Overview</div>
+    <div class="sec-title">대상지 개요 및 건물 유형 분석</div>
+    <div class="sec-lead">건축물대장 기준 건물 분류와, 유형별 특성에 따른 단계 분석입니다. 건물 유형에 따라 수요의 성격이 다르므로 같은 면적이라도 평가 기준을 달리 적용합니다.</div>
+    <div class="badges" id="bldgBadges"></div>
+    <table class="kv" id="bldgTable"></table>
+    <div style="margin-top:18px; padding:14px 18px; background:var(--wash); border-radius:8px; font-size:13px;" id="typeTrait"></div>
+    <div class="stages" id="stageList"></div>
+  </section>
+
+  <!-- II. 종합 적합도 -->
+  <section>
+    <div class="sec-label">II. Overall Feasibility</div>
+    <div class="sec-title">종합 적합도</div>
+    <div class="sec-lead">5개 평가 축 가중 합산(v2) — 거리 가중 경쟁·유형별 물리 기준·데이터 신뢰도·리스크 상한을 반영합니다. 점수는 검토 우선순위 자료이며 수익을 보장하지 않습니다.</div>
+    <div class="verdict-wrap">
+      <div class="seal"><div class="g" id="gradeBig">—</div><div class="s">GRADE</div></div>
+      <div class="verdict-body">
+        <div class="verdict-score"><b id="scoreBig">—</b> / 100</div>
+        <div class="verdict-line" id="verdictLine">—</div>
+        <div class="bars" id="scoreBars"></div>
+        <div class="score-note" id="confidenceNote">데이터 신뢰도 —</div>
+        <div class="score-note" id="blockerNote" style="display:none; color:var(--warn);"></div>
+        <div class="score-note">등급: S 90+ · A 80+ · B 68+ · C 50+ · D 50 미만 · 거리·유형·리스크 가중 v2 모델</div>
+        <div class="score-note">
+  ※ 물리 조건은 1층 여부 및 접근성, 매장 면적 확보 가능성, 주차 여건, 건물 유형 및 용도 제약 여부를 기준으로 평가합니다.
+      </div>
+    </div>
+  </section>
+
+  <!-- III. 긍정 요인 / 유의 사항 -->
+  <section>
+    <div class="sec-label">III. Key Findings</div>
+    <div class="sec-title">긍정 요인 및 유의 사항</div>
+    <div class="sec-lead">파마스퀘어 모델 기준 핵심 조건별 확인 결과입니다. 판단은 조사 시점 데이터에 근거한 사실 기재이며, 유불리 해석은 파트너님의 검토를 위한 참고 정보입니다.</div>
+    <div style="font-weight:700; font-size:14px; color:var(--ok); margin-bottom:4px;">● 긍정 요인</div>
+    <div class="fit-list" id="fitOk"></div>
+    <div style="font-weight:700; font-size:14px; color:var(--warn); margin:20px 0 4px;">◐ 유의 사항</div>
+    <div class="fit-list" id="fitWarn"></div>
+  </section>
+
+  <!-- IV. 배후 수요 -->
+  <section>
+    <div class="sec-label">IV. Catchment Demand</div>
+    <div class="sec-title">배후 수요</div>
+    <div class="sec-lead">공공데이터 도로명별 주민등록 인구·세대 현황과 반경 5km 주변시설을 함께 참고한 배후 수요입니다.</div>
+    <div class="grid" id="demandGrid"></div>
+  </section>
+
+  <!-- V. 유동·집객력 -->
+  <section>
+    <div class="sec-label">V. Traffic &amp; Anchors</div>
+    <div class="sec-title">유동 · 집객력</div>
+    <div class="sec-lead">상권 유형 및 주변 집객 시설 현황입니다.</div>
+    <div class="grid" id="trafficGrid"></div>
+    <table class="kv" id="anchorTable" style="margin-top:14px;"></table>
+    <div style="margin-top:22px; font-weight:700; font-size:14px;">대형 시설 · 관광 인프라 <span style="font-weight:400; color:var(--gray); font-size:12px;">(반경 5km 내외 특색 시설)</span></div>
+    <table class="tbl" style="margin-top:8px;">
+      <thead><tr><th>시설</th><th>유형</th><th class="num">거리</th><th>출점 관점 의미</th></tr></thead>
+      <tbody id="landmarkRows"></tbody>
+    </table>
+  </section>
+
+  <!-- VI. 경쟁 환경 -->
+  <section>
+    <div class="sec-label">VI. Competitive Landscape</div>
+    <div class="sec-title">경쟁 환경</div>
+    <div class="sec-lead">반경 내 약국 · 창고형 약국 · H&amp;B 스토어 분포입니다. 창고형 약국은 <b>브랜드 DB + 장소검색 키워드</b>로 탐지하며, 1km·2km·5km 거리별로 확인합니다.</div>
+    <div class="map-head">
+      <div class="legend">
+        <span><span class="dot" style="background:var(--teal)"></span>약국 <b id="cntPh">—</b></span>
+        <span><span class="dot" style="background:var(--red)"></span>창고형 약국 <b id="cntWh">—</b></span>
+        <span><span class="dot" style="background:var(--amber)"></span>H&amp;B <b id="cntHb">—</b></span>
+      </div>
+      <div class="radius-toggle" id="radiusToggle"></div>
+    </div>
+    <div id="map"></div>
+    <div id="warehouseStoresBox" style="margin-top:14px; display:none;">
+      <div style="font-weight:700;font-size:14px;">탐지된 창고형·대형 약국 <span style="font-weight:400;color:var(--gray);font-size:12px;" id="warehouseStoresLabel"></span></div>
+      <table class="tbl" style="margin-top:8px;">
+        <thead><tr><th>상호</th><th class="num">거리</th><th>분류 근거</th></tr></thead>
+        <tbody id="warehouseStoreRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- VII. 시세 (실거래가) -->
+  <section>
+    <div class="sec-label">VII. Transaction Prices</div>
+    <div class="sec-title">상가 시세 — 실거래가 기준</div>
+    <div class="sec-lead">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
+    <div class="grid" style="margin-bottom:16px;" id="priceGrid"></div>
+    <table class="tbl">
+      <thead><tr><th>거래시점</th><th>소재</th><th class="num">전용(평)</th><th class="num">거래금액</th><th class="num">평당가</th></tr></thead>
+      <tbody id="dealRows"></tbody>
+    </table>
+  </section>
+
+
+ <!-- VIII. 종합 의견 -->
+  <section>
+    <div class="sec-label">VIII. Summary Opinion</div>
+    <div class="sec-title">종합 의견 및 가맹점주 검토 포인트</div>
+    <div class="sec-lead">평가 결과 기반 자동 생성 의견이며, 제출 전 수정 가능합니다.</div>
+    <div class="opinion" id="opinionBox" contenteditable="true"></div>
+    <div class="edit-hint">✎ 위 의견은 클릭하여 직접 수정한 뒤 인쇄할 수 있습니다.</div>
+  </section>
+
+  <!-- 내부 메모 (가맹점주 제공용에서 숨김) -->
+  <section class="internal-only">
+    <div class="sec-label">Internal Only</div>
+    <div class="sec-title">내부 검토 메모</div>
+    <div class="sec-lead">가맹점주 제공용 리포트에는 표시되지 않는 영역입니다.</div>
+    <table class="kv" id="internalTable"></table>
+  </section>
+
+  <div class="footer">
+    본 자료는 파마스퀘어 사업 모델 관련 사업 협력 검토 목적의 참고자료로서 작성되었으며, 제공된 내용은 현재 시점에서의 가정, 시장 환경, 내부 분석 및 제한된 정보에 기반하여 작성되었습니다.
+    본 자료에 포함된 수치는 추정치로서 실제 운영 환경, 입지 조건, 시장 상황 등에 따라 상당한 차이가 발생할 수 있으며, 특정 성과 또는 수익을 보장하지 않습니다.
+    본 자료에 포함된 모든 정보는 기밀 정보로서 사전 서면 동의 없이 제3자에게 제공, 복제 또는 공개될 수 없습니다.
+    <div class="ftr-row"><span style="font-weight:700; letter-spacing:0.3em;">PHAMA SQUARE</span><span id="ftrDate">—</span></div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   1) 데모 데이터 — 실데이터 모드에서는 API 응답으로 대체
+   ========================================================= */
+const fmt = n => (n==null ? "—" : Number(n).toLocaleString("ko-KR"));
+const displayValue = (value, suffix="") => {
+  if (value == null || value === "" || Number.isNaN(value)) return "확인 필요";
+  if (typeof value === "number") return `${fmt(value)}${suffix}`;
+  return `${value}${suffix}`;
+};
+
+const EMPTY = {
+  address: "주소를 입력하고 분석을 실행하세요",
+  building: {
+    type: "근린상가",
+    mainUse: "[분석 후 표시]", floor: "[분석 후 표시]", areaPy: 0,
+    approvedYear: null, parking: "건물 내 주차 가능 여부 및 대수 현장 확인 필요", landUse: "토지이용계획 확인 필요",
+    roadFacing: "전면 도로 폭 및 차량 진출입 가능 여부 현장 확인 필요",
+    inBldgUnits: null, occupancy: null, workers: null,
+    nearbySame: null, keyTenants: null,
+    anchorSummary: "주소 분석 후 주변 집객 시설이 자동 표시됩니다."
+  },
+  demand: {
+    households5km: 0, population5km: 0, age3050ratio: null, ageBasis: "해당 동 기준 예정", ageRegion: "",
+    aptComplexes: null, note: "공공데이터 인구·세대 현황 기준", demandSource: null
+  },
+  traffic: {
+    bizType: "[분석 후 표시]", weekdayPeak: "오전 10–12시 / 오후 4–7시",
+    anchors: [["주변시설", "주소 분석 후 자동 조회됩니다"]],
+    metrics: {}
+  },
+  competition: {
+    "1km":  { pharmacies:0, warehouse:0, hnb:0, warehouseStores:[] },
+    "2km":  { pharmacies:0, warehouse:0, hnb:0, warehouseStores:[] },
+    "5km":  { pharmacies:0, warehouse:0, hnb:0, warehouseStores:[] }
+  },
+  landmarks: [],
+  mapCenter: { lat: 37.5665, lng: 126.9780 },
+  price: {
+    salePerPy: 0, rentPerPy: null, rentSource: null, deals12mo: 0,
+    deals: []
+  },
+  internal: [
+    ["임대 협상 포인트", "[현장 실사 후 기재]"],
+    ["계약 구조", "상표 사용·운영 협력 계약(수수료) + 컨설팅 계약"],
+    ["약사 매칭", "[본사 DB 기준 후보 약사 확인]"],
+    ["오픈 가능 시점", "계약 후 약 5개월 (설계·인테리어·상품 세팅 포함)"],
+    ["리스크", "[상권 공급·임대시세 등 현장 확인 후 기재]"]
+  ],
+  knowledgeCenterSample: { inBldgUnits: "[확인 필요]", occupancy: null, workers: null, nearbySame: null },
+  quality: {},
+  scoreMeta: { blockers: [], confidence: 0 }
+};
+
+/* =========================================================
+   2) 점수 엔진 v2 — 거리 가중 · 유형 보정 · 신뢰도 · 리스크 상한
+   ========================================================= */
+function isFirstFloor(floorText) {
+  return /(?:^|[^\d])1층(?!\d)/.test(String(floorText || ""));
+}
+
+function clamp01(v) {
+  return Math.max(0, Math.min(1, Number(v) || 0));
+}
+
+function smoothRatio(value, full, soft = 0.65) {
+  const v = Number(value) || 0;
+  const f = Number(full) || 1;
+  if (v <= 0) return 0;
+  const linear = clamp01(v / f);
+  return linear * soft + Math.pow(linear, 0.55) * (1 - soft);
+}
+
+function distanceScore(meters, ideal, good, fair) {
+  const d = Number(meters);
+  if (!d && d !== 0) return 0.35;
+  if (d <= ideal) return 1;
+  if (d <= good) return 0.85 - ((d - ideal) / (good - ideal)) * 0.25;
+  if (d <= fair) return 0.55 - ((d - good) / (fair - good)) * 0.35;
+  return Math.max(0.1, 0.25 - (d - fair) / 8000);
+}
+
+function warehouseThreat(warehouseStores) {
+  let threat = 0;
+  for (const s of warehouseStores || []) {
+    const d = Number(s.distance ?? 99999);
+    if (d <= 400) threat += 1.0;
+    else if (d <= 800) threat += 0.9;
+    else if (d <= 1200) threat += 0.75;
+    else if (d <= 2000) threat += 0.5;
+    else if (d <= 3500) threat += 0.28;
+    else if (d <= 5000) threat += 0.12;
+  }
+  return Math.min(2.2, threat);
+}
+
+function hasParking(b) {
+  const p = String(b?.parking || "");
+  if (!p || p.includes("없음") || p.includes("미확보") || p.includes("확인 필요")) return false;
+  return true;
+}
+
+function isCommercialLandUse(landUse) {
+  return /상업|근린|유통|업무|주상|복합/.test(String(landUse || ""));
+}
+
+function computeDataConfidence(quality) {
+  const weights = {
+    geocode: 8,
+    building: 18,
+    trade: 16,
+    population: 14,
+    places: 16,
+    competition: 18,
+    landuse: 10
+  };
+  let sum = 0;
+  let max = 0;
+  for (const [k, w] of Object.entries(weights)) {
+    max += w;
+    if (quality?.[k]) sum += w;
+  }
+  return Math.round((sum / max) * 100);
+}
+
+function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
+  const cfg = CONFIG.SCORING?.DEMAND || {};
+  const households = toNumber(demand.households5km);
+  const hhFull = demand.demandSource === "road"
+    ? (cfg.ROAD_HOUSEHOLD_FULL || CONFIG.ROAD_HOUSEHOLD_BENCHMARK || 8000)
+    : (cfg.REGION_HOUSEHOLD_FULL || 120000);
+
+  let hh = smoothRatio(households, hhFull);
+  let age = demand.age3050ratio != null ? smoothRatio(demand.age3050ratio, cfg.AGE_TARGET_RATIO || 48) : 0.45;
+  let apt = demand.aptComplexes != null ? smoothRatio(demand.aptComplexes, cfg.APT_COMPLEX_FULL || 40) : 0.4;
+
+  const subwayBoost = distanceScore(trafficMetrics?.subwayDistM, 400, 1200, 3000) * 0.12;
+  const composite = clamp01(hh * 0.42 + age * 0.28 + apt * 0.22 + subwayBoost + 0.08);
+
+  return Math.round(composite * typeFactor * max);
+}
+
+function scoreTrafficV2(traffic, landmarks, max, metrics) {
+  const cfg = CONFIG.SCORING?.TRAFFIC || {};
+  const m = metrics || traffic.metrics || {};
+
+  const subway = distanceScore(m.subwayDistM, cfg.SUBWAY_IDEAL_M || 400, cfg.SUBWAY_GOOD_M || 1200, 3000);
+  const mart = distanceScore(m.martDistM, cfg.MART_IDEAL_M || 800, cfg.MART_GOOD_M || 2500, 5000);
+  const hospital = distanceScore(m.hospitalDistM, 600, 2000, 5000);
+  const school = distanceScore(m.schoolDistM, 500, 1800, 4500);
+
+  const anchorBreadth = clamp01((traffic.anchors?.length || 0) / 4) * 0.18;
+  const landmarkScore = Math.min(0.14, (landmarks?.length || 0) * 0.035);
+  const bizBonus = /복합|대중교통/.test(traffic.bizType || "") ? 0.06 : 0;
+
+  const composite = clamp01(
+    subway * 0.34 +
+    mart * 0.22 +
+    hospital * 0.12 +
+    school * 0.08 +
+    anchorBreadth +
+    landmarkScore +
+    bizBonus +
+    0.08
+  );
+
+  return Math.round(composite * max);
+}
+
+function scoreCompetitionV2(competition, max) {
+  const c1 = competition?.["1km"] || { pharmacies: 0, warehouse: 0, hnb: 0, warehouseStores: [] };
+  const c2 = competition?.["2km"] || c1;
+  const c5 = competition?.["5km"] || c2;
+
+  const whThreat1 = warehouseThreat(c1.warehouseStores);
+  const whThreat2 = Math.max(0, warehouseThreat(c2.warehouseStores) - whThreat1 * 0.65);
+  const whThreat5 = Math.max(0, warehouseThreat(c5.warehouseStores) - whThreat2 * 0.5);
+
+  let s = 1.0;
+  s -= Math.min(0.48, whThreat1 * 0.42);
+  s -= Math.min(0.22, whThreat2 * 0.28);
+  s -= Math.min(0.10, whThreat5 * 0.12);
+
+  const ph1 = c1.pharmacies || 0;
+  if (ph1 === 0) s -= 0.08;
+  else if (ph1 <= 6) s += 0.04;
+  else if (ph1 <= 14) s -= 0.04;
+  else s -= 0.12;
+
+  s -= Math.min(0.22, (c2.hnb || 0) * 0.035);
+  if ((c2.warehouse || 0) === 0 && (c5.warehouse || 0) <= 1) s += 0.05;
+
+  return Math.round(clamp01(s) * max);
+}
+
+function scoreEconomicsV2(price, max, buildingType) {
+  const rent = price.rentPerPy;
+  const sale = price.salePerPy;
+  const deals = price.deals12mo || 0;
+  const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
+
+  if (rent == null || rent <= 0) {
+    if (sale > 0 && deals > 0) {
+      const ratio = CONFIG.RENT_SALE_RATIO?.[buildingType] || 240;
+      const impliedRent = sale / ratio;
+      const r = impliedRent / benchmark;
+      const partial = r <= 1 ? 0.72 : r <= 1.4 ? 0.58 : 0.42;
+      return Math.round(partial * max);
+    }
+    return Math.round(max * 0.42);
+  }
+
+  const ratio = rent / benchmark;
+  let s;
+  if (ratio <= 0.85) s = 1;
+  else if (ratio <= 1) s = 0.95;
+  else if (ratio <= 1.2) s = 0.82;
+  else if (ratio <= 1.45) s = 0.65;
+  else if (ratio <= 1.8) s = 0.45;
+  else if (ratio <= 2.2) s = 0.28;
+  else s = 0.18;
+
+  if (deals >= 3) s = Math.min(1, s + 0.06);
+  else if (deals === 0) s *= 0.88;
+
+  return Math.round(s * max);
+}
+
+function scorePhysicalV2(building, max) {
+  const cfg = CONFIG.SCORING?.PHYSICAL || {};
+  const ideal = cfg.AREA_IDEAL_PY || 200;
+  const minPy = cfg.AREA_MIN_PY || 150;
+  const floorPy = cfg.AREA_FLOOR_PY || 120;
+  const type = building.type || "근린상가";
+
+  let s = 0.08;
+
+  if (isFirstFloor(building.floor)) s += 0.32;
+  else if (/2층|지하1|B1/i.test(String(building.floor || ""))) s += 0.12;
+
+  const area = toNumber(building.areaPy);
+  if (area >= ideal) s += 0.28;
+  else if (area >= minPy) s += 0.18;
+  else if (area >= floorPy) s += 0.08;
+  else if (area > 0) s += 0.02;
+
+  if (hasParking(building)) s += 0.22;
+  else s -= 0.05;
+
+  if (type === "근린상가" || type === "복합상가") s += 0.12;
+  else if (type === "아파트 단지내 상가") s += 0.06;
+  else if (type === "지식산업센터") s -= 0.08;
+
+  if (isCommercialLandUse(building.landUse)) s += 0.06;
+
+  const road = String(building.roadFacing || "");
+  if (/8m|간선|대로|왕복|이상/.test(road)) s += 0.06;
+  else if (/6m|보조|생활도로/.test(road)) s += 0.03;
+
+  return Math.round(clamp01(s) * max);
+}
+
+function applyScoreVetoes(total, blockers, vetoCfg) {
+  let capped = total;
+  const notes = [...blockers];
+
+  if (blockers.includes("warehouse_1km") && vetoCfg.WAREHOUSE_1KM_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.WAREHOUSE_1KM_MAX_TOTAL);
+  }
+  if (blockers.includes("no_parking") && vetoCfg.NO_PARKING_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.NO_PARKING_MAX_TOTAL);
+  }
+  if (blockers.includes("rent_high") && vetoCfg.RENT_2X_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.RENT_2X_MAX_TOTAL);
+  }
+  if (blockers.includes("area_small") && vetoCfg.AREA_UNDER_120_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.AREA_UNDER_120_MAX_TOTAL);
+  }
+
+  return { total: capped, blockers: notes };
+}
+
+function gradeOfV2(total) {
+  const grades = CONFIG.SCORING?.GRADES || [
+    { min: 90, grade: "S", verdict: "최우선 검토 입지" },
+    { min: 80, grade: "A", verdict: "적합 — 출점 검토 권장" },
+    { min: 68, grade: "B", verdict: "조건부 적합" },
+    { min: 50, grade: "C", verdict: "신중 검토" },
+    { min: 0, grade: "D", verdict: "부적합" }
+  ];
+  const row = grades.find(g => total >= g.min) || grades[grades.length - 1];
+  return [row.grade, row.verdict];
+}
+
+function collectScoreBlockers(data) {
+  const blockers = [];
+  const c1 = data.competition?.["1km"] || {};
+  const b = data.building || {};
+  const rent = data.price?.rentPerPy;
+  const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
+
+  if ((c1.warehouse || 0) > 0 || warehouseThreat(c1.warehouseStores) >= 0.75) {
+    blockers.push("warehouse_1km");
+  }
+  if (!hasParking(b)) blockers.push("no_parking");
+  if (rent != null && rent > benchmark * 2) blockers.push("rent_high");
+  if (toNumber(b.areaPy) > 0 && toNumber(b.areaPy) < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
+    blockers.push("area_small");
+  }
+  return blockers;
+}
+
+function computeFullScore(data) {
+  const b = data.building || {};
+  const prof = TYPE_PROFILES[b.type] || TYPE_PROFILES["근린상가"];
+  const W = CONFIG.WEIGHTS;
+  const vetoCfg = CONFIG.SCORING?.VETO || {};
+
+  const sc = {
+    demand: scoreDemandV2(data.demand, W.demand, prof.factor, data.traffic?.metrics),
+    traffic: scoreTrafficV2(data.traffic, data.landmarks, W.traffic, data.traffic?.metrics),
+    competition: scoreCompetitionV2(data.competition, W.competition),
+    economics: scoreEconomicsV2(data.price, W.economics, b.type),
+    physical: scorePhysicalV2(b, W.physical)
+  };
+
+  let total = Object.values(sc).reduce((a, v) => a + v, 0);
+  const blockers = collectScoreBlockers(data);
+  const vetoed = applyScoreVetoes(total, blockers, vetoCfg);
+  total = vetoed.total;
+
+  const [grade, verdict] = gradeOfV2(total);
+  const confidence = computeDataConfidence(data.quality || {});
+
+  return { sc, total, grade, verdict, blockers: vetoed.blockers, confidence };
+}
+
+/* =========================================================
+   3) 렌더링
+   ========================================================= */
+const $ = id => document.getElementById(id);
+let currentRadius = "5km";
+let DATA = JSON.parse(JSON.stringify(EMPTY));
+
+function render(){
+  const d = DATA, b = d.building;
+  const prof = TYPE_PROFILES[b.type] || TYPE_PROFILES["근린상가"];
+  const today = new Date();
+  const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,"0")}.${String(today.getDate()).padStart(2,"0")}`;
+  $("mAddr").textContent = d.address;
+  $("mDate").textContent = dateStr;
+  $("ftrDate").textContent = dateStr + " 작성";
+
+  /* I. 개요 + 유형 분석 */
+  $("bldgBadges").innerHTML =
+    `<span class="badge">${b.type}</span>` +
+    (b.type === "지식산업센터" ? `<span class="badge alert">용도 제약 검토 필요</span>` : "") +
+    `<span class="badge soft">${b.mainUse}</span>` +
+    `<span class="badge soft">${b.floor} · ${b.areaPy ? `건물 연면적 약 ${b.areaPy}평` : "임대 전용면적 확인 필요"}</span>` +
+    (b.approvedYear ? `<span class="badge soft">사용승인 ${b.approvedYear}년</span>` : "");
+  $("bldgTable").innerHTML = [
+    ["용도지역", b.landUse], ["주차", b.parking], ["도로 조건", b.roadFacing]
+  ].map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  $("typeTrait").innerHTML = `<b>「${b.type}」 유형 특성</b> — ${prof.trait}`;
+  const stageData = { ...b, households5km: d.demand.households5km };
+  $("stageList").innerHTML = prof.stages.map((st, i) =>
+    `<div class="stage"><div class="stage-no">${i+1}</div>
+      <div><div class="stage-t">${st[0]}</div><div class="stage-d">${st[1](stageData)}</div></div></div>`).join("");
+
+  /* II. 점수 */
+  const W = CONFIG.WEIGHTS;
+  const scoreResult = computeFullScore(d);
+  const { sc, total, grade, verdict, blockers, confidence } = scoreResult;
+  d.scoreMeta = { blockers, confidence };
+
+  $("gradeBig").textContent = grade;
+  $("scoreBig").textContent = total;
+  $("verdictLine").textContent = verdict;
+  $("confidenceNote").textContent = `데이터 신뢰도 ${confidence}% — ${confidence >= 75 ? "공공·장소 데이터 충분" : confidence >= 50 ? "일부 API 누락, 보수 해석 권장" : "핵심 데이터 부족, 참고용"}`;
+
+  const blockerLabels = {
+    warehouse_1km: "1km 내 창고형 약국 존재 → 등급 상한 적용",
+    no_parking: "주차 미확보 → 등급 상한 적용",
+    rent_high: "임대료 기준 2배 초과 → 경제성 상한",
+    area_small: "면적 120평 미만 추정 → 물리 조건 상한"
+  };
+  if (blockers.length) {
+    $("blockerNote").style.display = "block";
+    $("blockerNote").textContent = "리스크 상한: " + blockers.map(k => blockerLabels[k] || k).join(" · ");
+  } else {
+    $("blockerNote").style.display = "none";
+  }
+
+  const names = { demand:"배후 수요", traffic:"유동·집객력", competition:"경쟁 환경", economics:"시세 대비 수익성", physical:"물리 조건" };
+  $("scoreBars").innerHTML = Object.keys(sc).map(k=>{
+    const pct = Math.round(sc[k]/W[k]*100);
+    return `<div class="bar-row">
+      <div class="bar-name">${names[k]}</div>
+      <div class="bar-track"><div class="bar-fill ${pct<60?"warn":""}" style="width:${pct}%"></div></div>
+      <div class="bar-val">${sc[k]}<span>/${W[k]}</span></div></div>`;
+  }).join("");
+
+  /* III. 긍정 요인 / 유의 사항 — 팩트 기반 */
+  const dm = d.demand;
+  const c1 = d.competition["1km"];
+  const c2 = d.competition["2km"] || c1;
+  const c5 = d.competition["5km"] || c2;
+  const householdLabel = dm.demandSource === "road"
+    ? `도로명 구간 배후 세대 — ${fmt(dm.households5km)}세대`
+    : `반경 5km 배후 세대 — ${fmt(dm.households5km)}세대`;
+  const householdThreshold = dm.demandSource === "road" ? 5000 : 80000;
+  const rentPerPy = d.price.rentPerPy;
+  const tradeKm = CONFIG.TRADE_RADIUS_KM || 2;
+  const rentGapPct = rentPerPy == null
+    ? null
+    : Math.round((rentPerPy / CONFIG.BENCHMARK_RENT_PER_PY - 1) * 100);
+  const whNames = (c5.warehouseStores || []).slice(0, 3).map(s => s.place_name).join(", ");
+  const fits = [
+    [c2.warehouse === 0 ? "ok" : (c1.warehouse === 0 ? "cond" : "no"),
+     "창고형 약국·유사 업태",
+     c2.warehouse === 0
+       ? `반경 2km 내 미탐지 (브랜드 DB·장소검색 기준). 5km 내 ${c5.warehouse}개소.`
+       : c1.warehouse > 0
+         ? `1km 내 ${c1.warehouse}개소, 2km 내 ${c2.warehouse}개소 확인${whNames ? ` (${whNames} 등)` : ""}. 직접 경쟁 전제 검토 필요.`
+         : `2km 내 ${c2.warehouse}개소 확인. 1km 직접 인접은 없으나 방문권 경쟁 가능.${whNames ? ` (${whNames} 등)` : ""}`],
+    [c5.pharmacies <= 50 ? "ok" : "cond",
+     `약국 분포 — 반경 5km 내 ${c5.pharmacies}개소 (1km ${c1.pharmacies}개소)`,
+     c5.pharmacies <= 50
+       ? "광역 기준 과밀 수준은 아닙니다."
+       : "광역 밀집도가 높습니다. 규모·구색 차별화가 전제되어야 합니다."],
+    [c2.hnb <= 4 ? "ok" : "cond",
+     `H&B 스토어 — 2km 내 ${c2.hnb}개소`,
+     c2.hnb <= 4
+       ? "뷰티 카테고리 중복은 제한적입니다."
+       : "H&B 분포가 많아 뷰티 카테고리 경쟁이 예상됩니다."],
+    [b.parking && hasParking(b) ? "ok" : "no",
+     "주차 여건",
+     hasParking(b)
+       ? `${b.parking}. 창고형 모델은 차량 방문 비중이 높아 주차는 필수 요건이며, 본 입지는 해당 요건을 충족합니다.`
+       : "주차 미확보. 창고형 모델의 필수 요건이 충족되지 않은 상태입니다."],
+    [b.areaPy >= 200 ? "ok" : (b.areaPy >= 150 ? "cond" : "no"),
+     `매장 면적 — 임대 전용면적 확인 필요`,
+     b.areaPy >= 200
+       ? "건축물대장상 면적은 확인되었으나, 실제 임대 전용면적은 현장/임대조건 확인이 필요합니다."
+       : "실제 임대 전용면적 확인 후 표준 모델 적용 가능 여부를 재검토해야 합니다."],
+    [dm.households5km >= householdThreshold ? "ok" : "cond",
+     householdLabel,
+     dm.households5km >= householdThreshold
+       ? `기준 규모(${fmt(householdThreshold)}세대) 이상입니다.`
+       : `기준 규모 미만 — 광역 차량 유입 의존도가 높아질 수 있습니다.`],
+    [rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no")),
+     rentPerPy == null
+       ? "임대료 수준 — 추정 불가"
+       : `임대료 수준 — 평당 ${rentPerPy}만원/월`,
+     rentGapPct == null
+       ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
+       : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`]
+  ];
+  const marks = { ok:"●", cond:"◐", no:"○" };
+  const fitRow = f => `<div class="fit"><div class="fit-mark ${f[0]}">${marks[f[0]]}</div>
+      <div><div class="fit-t">${f[1]}</div><div class="fit-d">${f[2]}</div></div></div>`;
+  const oks = fits.filter(f=>f[0]==="ok"), warns = fits.filter(f=>f[0]!=="ok");
+  $("fitOk").innerHTML = oks.length ? oks.map(fitRow).join("") : '<div class="fit-d" style="padding:8px 0;">해당 없음</div>';
+  $("fitWarn").innerHTML = warns.length ? warns.map(fitRow).join("") : '<div class="fit-d" style="padding:8px 0;">확인된 유의 사항 없음</div>';
+
+  /* IV. 배후 수요 */
+  $("demandGrid").innerHTML = [
+    ["배후 세대수", displayValue(dm.households5km, "세대"), dm.demandSource === "road" ? "도로명 구간 인구·세대 (5km 아님)" : "광역 인구·세대 기준", true],
+    ["배후 인구", displayValue(dm.population5km, "명"), dm.demandSource === "road" ? "도로명 구간 인구·세대 (5km 아님)" : "광역 인구·세대 기준", false],
+    ["30–50대 비중", dm.age3050ratio == null ? "연령 데이터 연동 예정" : `${dm.age3050ratio}%`, dm.ageBasis || "해당 동 기준", false],
+    ["아파트 단지", dm.aptComplexes == null ? "확인 필요" : `${fmt(dm.aptComplexes)}개 단지`, dm.note || "공공데이터·장소검색 기준", false]
+  ].map(m=>`<div class="metric ${m[3]?"hl":""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+
+  /* V. 유동·집객력 */
+  const t = d.traffic;
+  $("trafficGrid").innerHTML = [
+    ["상권 유형", t.bizType, ""], ["피크 시간대", t.weekdayPeak, "상권 유형 기반 추정"]
+  ].map(m=>`<div class="metric"><div class="l">${m[0]}</div><div class="v" style="font-size:16px">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+  $("anchorTable").innerHTML = t.anchors.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+  $("landmarkRows").innerHTML = (d.landmarks||[]).length
+    ? d.landmarks.map(r =>
+        `<tr><td style="font-weight:600">${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td><td style="color:#444">${r[3]}</td></tr>`).join("")
+    : `<tr><td colspan="4" style="color:var(--gray)">반경 5km 내 대형 집객·쇼핑 시설 조회 결과 없음</td></tr>`;
+
+  /* VI. 경쟁 환경 */
+  renderCompetition(currentRadius);
+
+  /* VII. 시세 */
+  const p = d.price;
+  $("priceGrid").innerHTML = [
+    ["평당 매매 실거래가", p.salePerPy > 0 ? fmt(p.salePerPy)+"만원" : "확인 필요", `반경 ${tradeKm}km 내 최근 12개월 평균`, true],
+    ["평당 임대료(월)", p.rentPerPy == null ? "추정 불가" : `${p.rentPerPy}만원`, p.rentSource || "매매 실거래 기반 추정", false],
+    ["최근 12개월 거래", p.deals12mo+"건", `반경 ${tradeKm}km 내 참고`, false]
+  ].map(m=>`<div class="metric ${m[3]?"hl":""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+  $("dealRows").innerHTML = p.deals.length
+    ? p.deals.map(r =>
+        `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td></tr>`).join("")
+    : `<tr><td colspan="5" style="color:var(--gray)">최근 실거래 조회 결과 없음</td></tr>`;
+
+  /* VIII. 종합 의견 — 팩트 기반 */
+  const rentOk = rentPerPy != null && rentPerPy <= CONFIG.BENCHMARK_RENT_PER_PY;
+  const parkingLabel = String(b.parking || "확인 필요").split("(")[0].trim();
+  const warnTexts = warns.map(f=>f[1].split(" — ")[0]).join(", ");
+  $("opinionBox").innerHTML =
+    `대상지는 <b>${dm.note}</b>에 위치한 ${b.type}이며, ${dm.demandSource === "road" ? "도로명 구간" : "광역"} 기준 주거 배후는 약 <b>${fmt(dm.households5km)}세대</b>입니다. ` +
+    `창고형 약국은 1km <b>${c1.warehouse}</b>개소 · 2km <b>${c2.warehouse}</b>개소 · 5km <b>${c5.warehouse}</b>개소로 탐지되었으며, 약국 ${c5.pharmacies}개소·H&B ${c2.hnb}개소(2km)가 분포합니다. ` +
+    `물리 조건은 ${b.floor}·${parkingLabel}으로 확인되며, 실제 임대 전용면적과 1층 사용 가능 여부는 현장 확인이 필요합니다. ` +
+    `${(d.landmarks&&d.landmarks.length)?`인근에 ${d.landmarks.slice(0,2).map(l=>l[0]).join(", ")} 등 대형 집객 시설이 위치합니다. `:""}` +
+    (rentPerPy == null
+      ? `평당 임대료는 인근 실거래 부족으로 <b>추정하지 못했습니다</b>. `
+      : `평당 임대료는 ${rentPerPy}만원(${d.price.rentSource || "실거래 추정"})으로 당사 표준 손익 모델 기준(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평)${rentOk?" 이내입니다":"을 상회합니다"}. `) +
+    `${warns.length?`유의 사항으로는 <b>${warnTexts}</b> 항목이 확인되었으며, 해당 내용은 III장에 상세 기재하였습니다. `:""}` +
+    `상기 결과를 종합한 평가는 <b>${total}점(${grade}등급)</b>입니다. 본 리포트의 수치는 조사 시점 기준 추정치이며, 최종 판단에 필요한 현장 실사와 임대 조건 확인은 계약 검토 단계에서 함께 진행합니다.`;
+
+  /* 내부 메모 */
+  $("internalTable").innerHTML = d.internal.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
+}
+
+/* ---- 지도 (데모: SVG / 실모드: 카카오맵) ---- */
+function renderCompetition(rk){
+  currentRadius = rk;
+  const c = DATA.competition[rk] || { pharmacies: 0, warehouse: 0, hnb: 0, warehouseStores: [] };
+  $("cntPh").textContent = c.pharmacies;
+  $("cntWh").textContent = c.warehouse;
+  $("cntHb").textContent = c.hnb;
+  document.querySelectorAll("#radiusToggle button").forEach(btn=>
+    btn.classList.toggle("on", btn.dataset.r===rk));
+
+  const stores = c.warehouseStores || [];
+  if (stores.length) {
+    $("warehouseStoresBox").style.display = "block";
+    $("warehouseStoresLabel").textContent = `(반경 ${rk} · 브랜드 DB·장소검색 기준)`;
+    $("warehouseStoreRows").innerHTML = stores.map(s =>
+      `<tr><td style="font-weight:600">${s.place_name}</td><td class="num">${formatDistance(s.distance)}</td><td style="color:#444">${s.matchReason || "창고형·대형 약국 패턴"}</td></tr>`
+    ).join("");
+  } else {
+    $("warehouseStoresBox").style.display = "none";
+  }
+
+  if (!CONFIG.KAKAO_JS_KEY) drawMockMap(rk, c);
+  else drawKakaoMap(rk);
+}
+function drawMockMap(rk, c){
+  const rings = { "1km":70, "2km":95, "5km":120 };
+  const rand = (seed)=>{ let x=seed; return ()=>{ x=(x*9301+49297)%233280; return x/233280; }; };
+  const mk = (n,color,seed)=>{
+    const r = rand(seed); let out="";
+    for(let i=0;i<Math.min(n,18);i++){
+      const a=r()*Math.PI*2, dist=30+r()*(rings[rk]-40);
+      out+=`<circle cx="${Math.round(430+Math.cos(a)*dist*1.6)}" cy="${Math.round(170+Math.sin(a)*dist)}" r="6" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    } return out;
+  };
+  $("map").innerHTML =
+   `<svg viewBox="0 0 860 340" width="100%" height="100%" role="img" aria-label="반경 ${rk} 내 경쟁사 분포 지도(데모)">
+     <rect width="860" height="340" fill="#EFEDE6"/>
+     <path d="M0 110 H860 M0 240 H860 M180 0 V340 M430 0 V340 M660 0 V340" stroke="#FFFFFF" stroke-width="14"/>
+     <path d="M0 110 H860 M430 0 V340" stroke="#D9D6CC" stroke-width="1"/>
+     <ellipse cx="430" cy="170" rx="${rings[rk]*1.6}" ry="${rings[rk]}" fill="#1D9E75" opacity="0.06" stroke="#1D9E75" stroke-dasharray="5 4"/>
+     ${mk(c.pharmacies, "#1D9E75", 11)} ${mk(c.hnb, "#B97515", 77)} ${mk(c.warehouse, "#C8102E", 41)}
+     <circle cx="430" cy="170" r="11" fill="#C8102E"/><circle cx="430" cy="170" r="4" fill="#fff"/>
+     <text x="430" y="150" text-anchor="middle" font-size="13" font-weight="700" fill="#111" font-family="Pretendard,sans-serif">대상지</text>
+     <text x="848" y="328" text-anchor="end" font-size="11" fill="#999" font-family="Pretendard,sans-serif">데모 지도 — 카카오맵 연동 시 실위치 표시</text>
+   </svg>`;
+}
+
+/* ---- 카카오맵 실연동 ---- */
+let kakaoMapObj = null;
+let kakaoSdkPromise = null;
+
+function loadKakaoSDK() {
+  if (window.kakao && window.kakao.maps) return Promise.resolve();
+  if (kakaoSdkPromise) return kakaoSdkPromise;
+
+  kakaoSdkPromise = new Promise((resolve, reject) => {
+    if (!CONFIG.KAKAO_JS_KEY) {
+      kakaoSdkPromise = null;
+      reject(new Error("카카오 JavaScript 키가 설정되지 않았습니다."));
+      return;
+    }
+
+    const timeoutMs = 12000;
+    let settled = false;
+
+    const finish = (fn) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+
+    const timer = setTimeout(() => {
+      finish(() => {
+        kakaoSdkPromise = null;
+        reject(new Error("카카오 지도 SDK 로드 시간이 초과되었습니다. 카카오 개발자 콘솔에 현재 사이트 도메인(예: http://localhost:8888)이 등록되어 있는지 확인해 주세요."));
+      });
+    }, timeoutMs);
+
+    const onReady = () => {
+      if (!window.kakao || !kakao.maps) {
+        finish(() => {
+          kakaoSdkPromise = null;
+          reject(new Error("카카오 지도 SDK를 초기화하지 못했습니다."));
+        });
+        return;
+      }
+      kakao.maps.load(() => finish(resolve));
+    };
+
+    const existing = document.querySelector('script[data-kakao-sdk="1"]');
+    if (existing) {
+      existing.addEventListener("load", onReady, { once: true });
+      existing.addEventListener("error", () => finish(() => {
+        kakaoSdkPromise = null;
+        reject(new Error("카카오 지도 SDK를 불러오지 못했습니다."));
+      }), { once: true });
+      return;
+    }
+
+    const s = document.createElement("script");
+    s.dataset.kakaoSdk = "1";
+    s.src = `https://dapi.kakao.com/v2/maps/sdk.js?appkey=${CONFIG.KAKAO_JS_KEY}&libraries=services&autoload=false`;
+    s.onload = onReady;
+    s.onerror = () => finish(() => {
+      kakaoSdkPromise = null;
+      reject(new Error("카카오 지도 SDK를 불러오지 못했습니다. 도메인 등록 및 키 설정을 확인해 주세요."));
+    });
+    document.head.appendChild(s);
+  });
+
+  return kakaoSdkPromise;
+}
+
+function resetRunButton() {
+  $("runBtn").textContent = "분석";
+  $("runBtn").disabled = false;
+}
+
+function setAnalysisStatus(text) {
+  $("runBtn").textContent = text || "분석 중...";
+}
+function drawKakaoMap(rk){
+  const comp = DATA.competition[rk] || { pharmacies: 0, warehouse: 0, hnb: 0 };
+  $("cntPh").textContent = comp.pharmacies;
+  $("cntWh").textContent = comp.warehouse;
+  $("cntHb").textContent = comp.hnb;
+
+  loadKakaoSDK().then(()=>{
+    const radiusM = { "1km":1000, "2km":2000, "5km":5000 }[rk];
+    const center = new kakao.maps.LatLng(DATA.mapCenter.lat, DATA.mapCenter.lng);
+    const level = { "1km":6, "2km":7, "5km":8 }[rk];
+    $("map").innerHTML = "";
+    kakaoMapObj = new kakao.maps.Map($("map"), { center, level });
+    new kakao.maps.Circle({ map:kakaoMapObj, center, radius:radiusM,
+      strokeWeight:1, strokeColor:"#1D9E75", strokeStyle:"dashed", fillColor:"#1D9E75", fillOpacity:0.05 });
+    new kakao.maps.Marker({ map:kakaoMapObj, position:center });
+    const places = new kakao.maps.services.Places();
+    const addMarkers = (list, color)=> list.forEach(p=>{
+      new kakao.maps.CustomOverlay({ map:kakaoMapObj,
+        position:new kakao.maps.LatLng(p.y,p.x),
+        content:`<div title="${p.place_name}" style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)"></div>` });
+    });
+    let phAll = [];
+    const fetchPage = (page)=> places.categorySearch("PM9", (res, status, pag)=>{
+      if (status !== kakao.maps.services.Status.OK) return finalize();
+      phAll = phAll.concat(res);
+      if (pag.hasNextPage && page < 3) pag.nextPage(); else finalize();
+    }, { location:center, radius:radiusM, page });
+    const finalize = ()=>{
+      const wh = phAll.filter(p => classifyWarehousePharmacy(p).isWarehouse);
+      const normal = phAll.filter(p => !wh.includes(p));
+      addMarkers(normal, "#1D9E75"); addMarkers(wh, "#C8102E");
+      let hbAll = [], done = 0;
+      CONFIG.HB_KEYWORDS.forEach(kw=> places.keywordSearch(kw, (res, status)=>{
+        if (status === kakao.maps.services.Status.OK) hbAll = hbAll.concat(res);
+        if (++done === CONFIG.HB_KEYWORDS.length) addMarkers(hbAll, "#B97515");
+      }, { location:center, radius:radiusM }));
+    };
+    fetchPage(1);
+  }).catch(() => {
+    $("map").innerHTML = "<p style='padding:16px;color:#7A7A7A;font-size:13px'>지도를 불러오지 못했습니다. 카카오 지도 키·도메인 설정을 확인해 주세요.</p>";
+  });
+}
+
+/* ---- 컨트롤 ---- */
+["1km","2km","5km"].forEach(rk=>{
+  const btn = document.createElement("button");
+  btn.textContent = rk; btn.dataset.r = rk;
+  btn.addEventListener("click", ()=> renderCompetition(rk));
+  $("radiusToggle").appendChild(btn);
+});
+
+/* =========================================================
+   4) 공공데이터 API 연동 — Netlify Functions 호출
+   ========================================================= */
+
+function formatDistance(m) {
+  const d = Number(m);
+  if (!d && d !== 0) return "—";
+  if (d < 1000) return `약 ${d}m`;
+  return `약 ${(d / 1000).toFixed(1)}km`;
+}
+
+function getDistanceKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const toRad = deg => Number(deg) * Math.PI / 180;
+
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+    Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) *
+    Math.sin(dLng / 2);
+
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function geocodeAddress(keyword, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (!window.kakao || !kakao.maps || !kakao.maps.services) {
+      resolve(null);
+      return;
+    }
+
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        resolve(null);
+      }
+    }, timeoutMs);
+
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(keyword, (result, status) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (status === kakao.maps.services.Status.OK && result.length) {
+        resolve({
+          lat: Number(result[0].y),
+          lng: Number(result[0].x)
+        });
+      } else {
+        resolve(null);
+      }
+    });
+  });
+}
+
+function geocodeInputAddress(addr, timeoutMs = 12000) {
+  return new Promise((resolve, reject) => {
+    if (!window.kakao || !kakao.maps || !kakao.maps.services) {
+      reject(new Error("카카오 지도 SDK가 준비되지 않았습니다."));
+      return;
+    }
+
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        reject(new Error("주소 좌표 변환 시간이 초과되었습니다."));
+      }
+    }, timeoutMs);
+
+    new kakao.maps.services.Geocoder().addressSearch(addr, (res, status) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (status === kakao.maps.services.Status.OK && res.length) resolve(res[0]);
+      else reject(new Error("주소를 찾을 수 없습니다. 지번 또는 도로명 주소로 다시 입력해 주세요."));
+    });
+  });
+}
+
+function getLatestSearchYm() {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+
+  return `${y}${m}`;
+}
+
+function normalizeItems(items) {
+  if (!items) return [];
+  if (Array.isArray(items)) return items;
+  if (items.item) {
+    if (Array.isArray(items.item)) return items.item;
+    return [items.item];
+  }
+  return [items];
+}
+
+function toNumber(value) {
+  if (value == null) return 0;
+  return Number(String(value).replace(/[^\d.-]/g, "")) || 0;
+}
+
+function parseJibunFromAddress(addressName) {
+  const match = String(addressName || "").match(/(\d+)(?:-(\d+))?/);
+
+  if (!match) {
+    return {
+      bun: "0000",
+      ji: "0000"
+    };
+  }
+
+  return {
+    bun: match[1].padStart(4, "0"),
+    ji: (match[2] || "0").padStart(4, "0")
+  };
+}
+
+function getAddressParamsFromKakao(result) {
+  const bCode = result.address?.b_code || result.road_address?.b_code || "";
+
+  const jibunAddress = result.address?.address_name || result.address_name || "";
+  const roadAddress = result.road_address || {};
+  const jibun = parseJibunFromAddress(jibunAddress);
+
+  const ctpvNm = result.address?.region_1depth_name || roadAddress.region_1depth_name || "";
+  const sggNm = result.address?.region_2depth_name || roadAddress.region_2depth_name || "";
+  const roadNm = roadAddress.road_name || "";
+
+  const fullAddress = result.address_name || roadAddress.address_name || jibunAddress;
+
+  return {
+    fullAddress,
+    bCode,
+    sigunguCd: bCode ? bCode.slice(0, 5) : "",
+    bjdongCd: bCode ? bCode.slice(5, 10) : "",
+    lawdCd: bCode ? bCode.slice(0, 5) : "",
+    bun: jibun.bun,
+    ji: jibun.ji,
+    ctpvNm,
+    sggNm,
+    roadNm,
+    roadNmCd: "",
+    lat: Number(result.y),
+    lng: Number(result.x)
+  };
+}
+
+async function callFunctionApi(name, params, label, timeoutMs = 25000) {
+  const query = new URLSearchParams(params);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const res = await fetch(`/.netlify/functions/${name}?${query}`, { signal: controller.signal });
+    let data;
+
+    try {
+      data = await res.json();
+    } catch {
+      throw new Error(`${label}: 응답 파싱 실패 (HTTP ${res.status})`);
+    }
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.message || `${label}: HTTP ${res.status}`);
+    }
+
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`${label}: 요청 시간 초과 (${Math.round(timeoutMs / 1000)}초)`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function callJusoApi(keyword) {
+  return callFunctionApi("juso", { keyword }, "주소 검색");
+}
+
+async function callPlacesApi({ x, y, category, keyword, radius = "5000", maxPages = "2" }) {
+  const params = { x, y, radius, maxPages };
+  if (category) params.category = category;
+  if (keyword) params.keyword = keyword;
+  return callFunctionApi("places", params, "주변 시설 검색");
+}
+
+function applyJusoParams(params, jusoResult) {
+  const first = jusoResult?.first;
+  if (!first) return params;
+
+  // rnMgtSn: 행정안전부 도로명코드 (인구 API roadNmCd)
+  if (first.rnMgtSn) params.roadNmCd = first.rnMgtSn;
+  if (first.admCd) {
+    params.sigunguCd = first.admCd.slice(0, 5);
+    params.bjdongCd = first.admCd.slice(5, 10);
+    params.lawdCd = first.admCd.slice(0, 5);
+    params.bCode = first.admCd;
+  }
+  // 주의: first.buldMnnm/buldSlno는 도로명 건물번호입니다.
+  // 건축물대장 API의 bun/ji는 지번 본번/부번이므로 여기서 덮어쓰면 안 됩니다.
+  if (first.jibunAddr) {
+    const jibun = parseJibunFromAddress(first.jibunAddr);
+    if (jibun.bun !== "0000") {
+      params.bun = jibun.bun;
+      params.ji = jibun.ji;
+    }
+  }
+  if (first.roadAddr) params.fullAddress = first.roadAddr;
+  return params;
+}
+
+function inferBuildingType(item) {
+  const use = String(item.mainPurpsCdNm || item.mainPurpsCd || item.etcPurps || "");
+  const name = String(item.bldNm || "");
+  const combined = use + name;
+  if (/지식산업|지식형|공장/.test(combined)) return "지식산업센터";
+  // if (/아파트|단지|공동주택|주상복합/.test(combined)) return "아파트 단지내 상가";
+  if (/복합|쇼핑|백화|몰|타워/.test(combined)) return "복합상가";
+  if (/근린|상가|판매|소매/.test(combined)) return "근린상가";
+  return "근린상가";
+}
+
+function inferBuildingTypeFromAddress(address) {
+  const text = String(address || "");
+  if (/지식산업|지산|테크노/.test(text)) return "지식산업센터";
+  // if (/아파트|단지/.test(text)) return "아파트 단지내 상가";
+  if (/복합|쇼핑몰|아울렛|백화점|몰/.test(text)) return "복합상가";
+  return "근린상가";
+}
+
+function inferBuildingTypeFromPlaces({ outletRes, deptRes, martRes }) {
+  const nearby = [
+    ...(outletRes?.items || []),
+    ...(deptRes?.items || []),
+    ...(martRes?.items || [])
+  ].filter(p => Number(p.distance) <= 300);
+  if (nearby.length >= 2) return "복합상가";
+  return null;
+}
+
+async function callBuildingApi(params) {
+  if (!params.sigunguCd || !params.bjdongCd) return null;
+
+  return callFunctionApi("building", {
+    sigunguCd: params.sigunguCd,
+    bjdongCd: params.bjdongCd,
+    bun: params.bun,
+    ji: params.ji,
+    platGbCd: "0"
+  }, "건축물대장");
+}
+
+async function callTradeApi(params) {
+  if (!params.lawdCd) return null;
+
+  try {
+    return await callFunctionApi("trade", {
+      lawdCd: params.lawdCd,
+      dealYmd: getLatestSearchYm()
+    }, "상업용 실거래");
+  } catch (error) {
+    return {
+      ok: false,
+      type: "trade",
+      optional: true,
+      message: error.message || "상업용 실거래 조회 실패"
+    };
+  }
+}
+
+async function callPopulationApi(params) {
+  if (!params.roadNmCd) return null;
+
+  const ym = getLatestSearchYm();
+
+  return callFunctionApi("population", {
+    roadNmCd: params.roadNmCd,
+    srchFrYm: ym,
+    srchToYm: ym
+  }, "인구·세대");
+}
+
+
+function makePnu(params) {
+  const bCode = String(params?.bCode || "");
+  if (bCode.length < 10) return "";
+
+  const bun = String(params?.bun || "0").replace(/\D/g, "").padStart(4, "0").slice(-4);
+  const ji = String(params?.ji || "0").replace(/\D/g, "").padStart(4, "0").slice(-4);
+
+  // PNU = 법정동코드 10자리 + 토지구분 1자리 + 본번 4자리 + 부번 4자리
+  // 토지구분: 1 일반, 2 산. 현재 주소검색 결과에서 산 여부가 확실치 않으면 일반(1)로 조회합니다.
+  const landType = String(params?.platGbCd || "1") === "2" ? "2" : "1";
+  return `${bCode.slice(0, 10)}${landType}${bun}${ji}`;
+}
+
+function fetchVworldJsonp(url) {
+  return new Promise((resolve, reject) => {
+    const callbackName = "__vworldLanduseCallback_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
+
+    const script = document.createElement("script");
+
+    const cleanup = () => {
+      try {
+        delete window[callbackName];
+      } catch {
+        window[callbackName] = undefined;
+      }
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    };
+
+    window[callbackName] = function (data) {
+      cleanup();
+      resolve(data);
+    };
+
+    script.onerror = function () {
+      cleanup();
+      reject(new Error("VWorld JSONP 호출 실패"));
+    };
+
+    script.src = url + "&callback=" + callbackName;
+    document.head.appendChild(script);
+
+    setTimeout(() => {
+      cleanup();
+      reject(new Error("VWorld JSONP 응답 시간 초과"));
+    }, 15000);
+  });
+}
+
+async function callLanduseApi(params) {
+  const pnu = makePnu(params);
+
+  if (!pnu) {
+    return {
+      ok: false,
+      type: "landuse",
+      optional: true,
+      message: "PNU를 만들 수 없습니다."
+    };
+  }
+
+  const key = CONFIG.VWORLD_API_KEY;
+
+  if (!key) {
+    return {
+      ok: false,
+      type: "landuse",
+      optional: true,
+      message: "VWORLD_API_KEY가 없습니다."
+    };
+  }
+
+  const query = new URLSearchParams({
+    pnu,
+    cnflcAt: "1",
+    format: "json",
+    numOfRows: "100",
+    pageNo: "1",
+    key,
+    domain: "phamasquare-site-report.netlify.app"
+  });
+
+  const url = `https://api.vworld.kr/ned/data/getLandUseAttr?${query.toString()}`;
+
+  try {
+    const data = await fetchVworldJsonp(url);
+
+    return {
+      ok: true,
+      type: "landuse",
+      optional: true,
+      pnu,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      type: "landuse",
+      optional: true,
+      pnu,
+      message: error.message || "VWorld JSONP 호출 실패"
+    };
+  }
+}
+
+function normalizeLanduseItems(data) {
+  const fields = [
+    // VWorld 원본 응답
+    data?.landUses?.field,
+    data?.landUses,
+
+    // Netlify Function 래핑 응답
+    data?.data?.landUses?.field,
+    data?.data?.landUses,
+    data?.data?.response?.body?.items,
+    data?.data?.response?.body?.items?.item,
+    data?.data?.fields,
+    data?.data?.field,
+    data?.data?.items,
+    data?.data?.item,
+
+    // 기타 호환
+    data?.response?.body?.items,
+    data?.response?.body?.items?.item,
+    data?.fields,
+    data?.field,
+    data?.items,
+    data?.item
+  ];
+
+  for (const value of fields) {
+    if (!value) continue;
+    if (Array.isArray(value)) return value;
+    if (value.item) return Array.isArray(value.item) ? value.item : [value.item];
+    if (typeof value === "object") return [value];
+  }
+  return [];
+}
+
+function pickLanduseName(item) {
+  if (!item) return "";
+  return (
+    item.prposAreaDstrcCodeNm ||
+    item.prposAreaDstrcNm ||
+    item.prposAreaDstrcCodeName ||
+    item.prposAreaDstrc ||
+    item.prposAreaDstrcSe ||
+    item.prposAreaDstrcCode ||
+    item.regstrSeCodeNm ||
+    item.regstrSeNm ||
+    item.useDistNm ||
+    item.zoneNm ||
+    item.lndcgrCodeNm ||
+    item.name ||
+    ""
+  );
+}
+
+function applyLanduseData(landuseResponse) {
+  const items = normalizeLanduseItems(landuseResponse);
+  const names = [...new Set(items.map(pickLanduseName).filter(Boolean))];
+
+  // 보고서에는 핵심 용도지역만 우선 표시합니다.
+  const coreArea = names.filter(name =>
+    /주거지역|상업지역|공업지역|녹지지역|관리지역|농림지역|자연환경보전지역/.test(name)
+  );
+
+  const selected = coreArea.length ? coreArea.slice(0, 1) : names.slice(0, 1);
+
+  if (selected.length) {
+    DATA.building.landUse = selected.join(" / ");
+  }
+}
+async function callLandCharacteristicsApi(params) {
+  const pnu = makePnu(params);
+
+  if (!pnu) {
+    return {
+      ok: false,
+      type: "land",
+      optional: true,
+      message: "PNU를 만들 수 없습니다."
+    };
+  }
+
+  const key = CONFIG.VWORLD_API_KEY;
+
+  if (!key) {
+    return {
+      ok: false,
+      type: "land",
+      optional: true,
+      message: "VWORLD_API_KEY가 없습니다."
+    };
+  }
+
+  const query = new URLSearchParams({
+    pnu,
+    stdrYear: String(new Date().getFullYear()),
+    format: "json",
+    numOfRows: "10",
+    pageNo: "1",
+    key,
+    domain: "phamasquare-site-report.netlify.app"
+  });
+
+  const url = `https://api.vworld.kr/ned/data/getLandCharacteristics?${query.toString()}`;
+
+  try {
+    const data = await fetchVworldJsonp(url);
+
+    return {
+      ok: true,
+      type: "land",
+      optional: true,
+      pnu,
+      data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      type: "land",
+      optional: true,
+      pnu,
+      message: error.message || "토지특성 JSONP 호출 실패"
+    };
+  }
+}
+
+function normalizeLandCharacteristicItems(response) {
+  const data = response?.data || response;
+
+  const fields = [
+    data?.landCharacteristics?.field,
+    data?.landCharacteristicss?.field,
+    data?.landCharacteristics,
+    data?.landCharacteristicss,
+    data?.field,
+    data?.items,
+    data?.item,
+    data?.response?.body?.items,
+    data?.response?.body?.items?.item
+  ];
+
+  for (const value of fields) {
+    if (!value) continue;
+    if (Array.isArray(value)) return value;
+    if (value.item) return Array.isArray(value.item) ? value.item : [value.item];
+    if (typeof value === "object") return [value];
+  }
+
+  return [];
+}
+
+function applyLandCharacteristicsData(landResponse) {
+  const items = normalizeLandCharacteristicItems(landResponse);
+  const item = items[0];
+
+  if (!item) return;
+
+  const roadSide =
+    item.roadSideCodeNm ||
+    item.roadSideNm ||
+    item.roadSide ||
+    "";
+
+  const landUseSituation =
+    item.ladUseSittnNm ||
+    item.ladUseSittnCodeNm ||
+    item.landUseSittnNm ||
+    "";
+
+  const terrain =
+    item.tpgrphHgCodeNm ||
+    item.tpgrphFrmCodeNm ||
+    "";
+
+  const roadSideLabelMap = {
+    "광대소각": "도로접면 양호",
+    "광대한면": "광대로 접면",
+    "중로한면": "중로 접면",
+    "소로한면": "소로 접면",
+    "세로한면": "세로 접면",
+    "맹지": "도로접면 확인 필요"
+  };
+
+  const landUseLabelMap = {
+    "상업용": "상업용 토지",
+    "주거용": "주거용 토지",
+    "공업용": "공업용 토지",
+    "주상용": "주거·상업 혼합용"
+  };
+
+  const roadSideLabel = roadSideLabelMap[roadSide] || roadSide;
+  const landUseLabel = landUseLabelMap[landUseSituation] || landUseSituation;
+
+  const parts = [];
+
+  if (roadSideLabel) parts.push(roadSideLabel);
+  if (landUseLabel) parts.push(landUseLabel);
+  if (terrain) parts.push(terrain);
+
+  if (parts.length) {
+    DATA.building.roadFacing = `${parts.join(" / ")} · 차량 진출입 가능 여부는 현장 확인 필요`;
+  }
+}
+
+function parseTradeXml(rawXml) {
+  if (!rawXml) return [];
+
+  const xml = new DOMParser().parseFromString(rawXml, "text/xml");
+  const items = [...xml.querySelectorAll("item")];
+
+  return items.map(item => {
+    const get = tag => item.querySelector(tag)?.textContent?.trim() || "";
+
+    const dealAmount = toNumber(get("dealAmount"));
+    const buildingAr = toNumber(get("buildingAr"));
+
+    const areaPy = buildingAr ? Math.round((buildingAr / 3.3058) * 10) / 10 : 0;
+    const pricePerPy = areaPy ? Math.round(dealAmount / areaPy) : 0;
+
+    return {
+      dealYear: get("dealYear"),
+      dealMonth: get("dealMonth"),
+      dealDay: get("dealDay"),
+      umdNm: get("umdNm"),
+      jibun: get("jibun") || formatTradeJibun(get("lnbrMnnm"), get("lnbrSlno")),
+      floor: get("floor"),
+      buildingType: get("buildingType"),
+      buildingUse: get("buildingUse"),
+      dealAmount,
+      buildingAr,
+      areaPy,
+      pricePerPy
+    };
+  });
+}
+
+function formatTradeJibun(main, sub) {
+  const m = String(main || "").trim();
+  const s = String(sub || "").trim();
+  if (!m) return "";
+  if (!s || s === "0") return m;
+  return `${m}-${s}`;
+}
+
+async function applyTradeData(tradeResponse, params) {
+  if (!tradeResponse?.raw) return;
+
+  const tradeRadiusKm = CONFIG.TRADE_RADIUS_KM || 2;
+  const allDeals = parseTradeXml(tradeResponse.raw)
+    .filter(d => d.dealAmount > 0 && d.areaPy > 0);
+
+  if (!allDeals.length) return;
+
+  const centerLat = Number(DATA.mapCenter?.lat || params?.lat);
+  const centerLng = Number(DATA.mapCenter?.lng || params?.lng);
+
+  if (!centerLat || !centerLng) return;
+
+  const MAX_TRADE_GEOCODE = 24;
+  const candidates = allDeals.slice(0, MAX_TRADE_GEOCODE);
+  const geocoded = await Promise.all(candidates.map(async (deal) => {
+    const dealAddressParts = [
+      params?.ctpvNm,
+      params?.sggNm,
+      deal.umdNm,
+      deal.jibun
+    ].filter(Boolean);
+
+    const dealAddress = dealAddressParts.join(" ");
+    const coord = await geocodeAddress(dealAddress, 6000);
+    if (!coord) return null;
+
+    const distanceKm = getDistanceKm(centerLat, centerLng, coord.lat, coord.lng);
+    if (distanceKm > tradeRadiusKm) return null;
+
+    return { ...deal, distanceKm };
+  }));
+
+  const nearbyDeals = geocoded.filter(Boolean);
+
+  const firstFloorDeals = nearbyDeals.filter(d => isFirstFloor(String(d.floor)));
+  const deals = (firstFloorDeals.length ? firstFloorDeals : nearbyDeals).slice(0, 5);
+
+  if (!deals.length) return;
+
+  const avgPricePerPy = Math.round(
+    deals.reduce((sum, d) => sum + d.pricePerPy, 0) / deals.length
+  );
+
+  DATA.price.salePerPy = avgPricePerPy;
+  DATA.price.deals12mo = deals.length;
+
+  DATA.price.deals = deals.map(d => [
+    `${d.dealYear}.${String(d.dealMonth).padStart(2, "0")}`,
+    `${d.umdNm || "인근"}${d.floor ? " " + d.floor + "층" : ""}${d.distanceKm ? ` · 약 ${d.distanceKm.toFixed(1)}km` : ""}`,
+    d.areaPy || "-",
+    `${Math.round(d.dealAmount / 10000 * 10) / 10}억`,
+    `${fmt(d.pricePerPy)}만`
+  ]);
+}
+
+function applyBackupTradeData(params) {
+// 실거래가 백업 데이터는 반경 기준 검증 전까지 사용하지 않습니다.
+return;
+}
+
+function applyRentEstimate() {
+  const sale = DATA.price.salePerPy;
+  if (!sale || sale <= 0) {
+    DATA.price.rentPerPy = null;
+    DATA.price.rentSource = null;
+    return;
+  }
+
+  const type = DATA.building.type || "근린상가";
+  const ratio = CONFIG.RENT_SALE_RATIO?.[type] || 240;
+  DATA.price.rentPerPy = Math.max(1, Math.round(sale / ratio));
+  DATA.price.rentSource = `반경 ${CONFIG.TRADE_RADIUS_KM || 2}km 1층 상업용 매매 실거래 기반 추정 (${type})`;
+}
+
+function findPopulationItemArray(obj) {
+  const found = [];
+
+  function walk(value) {
+    if (!value || typeof value !== "object") return;
+
+    if (Array.isArray(value)) {
+      if (value.some(item => item && typeof item === "object" && ("totNmprCnt" in item || "hhCnt" in item || "roadNmCd" in item))) {
+        found.push(value);
+      }
+      value.forEach(walk);
+      return;
+    }
+
+    if (value.item) {
+      const normalized = normalizeItems(value.item);
+      if (normalized.length && normalized.some(item => item && typeof item === "object")) found.push(normalized);
+    }
+
+    Object.values(value).forEach(walk);
+  }
+
+  walk(obj);
+  return found[0] || [];
+}
+
+function getPopulationItems(populationResponse) {
+  const candidates = [
+    populationResponse?.data?.response?.body?.items,
+    populationResponse?.data?.response?.body?.items?.item,
+    populationResponse?.data?.response?.items,
+    populationResponse?.data?.response?.items?.item,
+    populationResponse?.data?.items,
+    populationResponse?.items
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeItems(candidate);
+    if (normalized.length) return normalized;
+  }
+
+  return findPopulationItemArray(populationResponse);
+}
+
+function applyPopulationData(populationResponse) {
+  if (!populationResponse) {
+    DATA.demand.note = "인구 API 미조회";
+    return;
+  }
+
+  const items = getPopulationItems(populationResponse);
+
+  if (!items.length) {
+    DATA.demand.population5km = null;
+    DATA.demand.households5km = null;
+    DATA.demand.note = "인구 API 응답 항목 확인 필요";
+    return;
+  }
+
+  const totalPopulation = items.reduce((sum, item) => {
+    return sum + toNumber(
+      item.totNmprCnt ||
+      item.totPpltnCnt ||
+      item.population ||
+      item.totNmpr ||
+      0
+    );
+  }, 0);
+
+  const totalHouseholds = items.reduce((sum, item) => {
+    return sum + toNumber(
+      item.hhCnt ||
+      item.householdCnt ||
+      item.hshldCnt ||
+      0
+    );
+  }, 0);
+
+  DATA.demand.population5km = totalPopulation || null;
+  DATA.demand.households5km = totalHouseholds || null;
+  DATA.demand.demandSource = "road";
+
+  // 현재 도로명별 주민등록 인구 API만으로는 연령대 비중 산출이 어려워 표시값을 분리합니다.
+  DATA.demand.age3050ratio = null;
+  DATA.demand.note = "공공데이터 도로명별 주민등록 인구·세대현황 기준 (5km 반경 아님)";
+}
+
+let AGE_POPULATION_CACHE = null;
+
+function parseCsvLine(line) {
+  const result = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (ch === "," && !inQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += ch;
+    }
+  }
+
+  result.push(current);
+  return result;
+}
+
+function parseCsv(text) {
+  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/).filter(line => line.trim());
+  if (lines.length < 2) return [];
+
+  const headers = parseCsvLine(lines[0]).map(h => h.trim());
+
+  return lines.slice(1).map(line => {
+    const values = parseCsvLine(line);
+    const row = {};
+    headers.forEach((header, idx) => {
+      row[header] = values[idx] || "";
+    });
+    return row;
+  });
+}
+
+async function loadAgePopulationCsv() {
+  if (AGE_POPULATION_CACHE) return AGE_POPULATION_CACHE;
+
+  const res = await fetch("/data/age_population.csv", { cache: "no-store" });
+  if (!res.ok) throw new Error(`연령 데이터 파일 조회 실패: HTTP ${res.status}`);
+
+  const text = await res.text();
+  AGE_POPULATION_CACHE = parseCsv(text);
+  return AGE_POPULATION_CACHE;
+}
+
+function cleanRegionName(value) {
+  return String(value || "")
+    .replace(/\([0-9]+\)/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getRegionCode(value) {
+  const match = String(value || "").match(/\((\d{10})\)/);
+  return match ? match[1] : "";
+}
+
+function extractDongName(regionName) {
+  const clean = cleanRegionName(regionName);
+  const parts = clean.split(" ");
+  return parts[parts.length - 1] || "";
+}
+
+function findAgePopulationRow(rows, params, addr) {
+  const addressText = `${addr || ""} ${params?.fullAddress || ""}`.replace(/\s+/g, " ");
+  const sggNm = params?.sggNm || "";
+
+  // 1순위: 주소 문자열에 읍면동명이 직접 들어간 경우
+  const exactDongRows = rows.filter(row => {
+    const region = cleanRegionName(row["행정구역"]);
+    const dong = extractDongName(region);
+    return sggNm && region.includes(sggNm) && dong && addressText.includes(dong);
+  });
+
+  if (exactDongRows.length) {
+    exactDongRows.sort((a, b) => cleanRegionName(b["행정구역"]).length - cleanRegionName(a["행정구역"]).length);
+    return { row: exactDongRows[0], basis: "해당 동 기준" };
+  }
+
+  // 2순위: 지번/도로명에서 동 이름을 못 찾으면 시군구 단위로 보수 매칭
+  const sggRows = rows.filter(row => {
+    const region = cleanRegionName(row["행정구역"]);
+    const code = getRegionCode(row["행정구역"]);
+    return sggNm && region.endsWith(sggNm) && /00000$/.test(code);
+  });
+
+  if (sggRows.length) {
+    return { row: sggRows[0], basis: "해당 시군구 기준" };
+  }
+
+  return { row: null, basis: "" };
+}
+
+function getAgeNumber(row, keyword) {
+  const key = Object.keys(row).find(k => k.includes(keyword));
+  return key ? toNumber(row[key]) : 0;
+}
+
+async function applyAgePopulationData(params, addr) {
+  const rows = await loadAgePopulationCsv();
+  const { row, basis } = findAgePopulationRow(rows, params, addr);
+
+  if (!row) {
+    DATA.demand.age3050ratio = null;
+    DATA.demand.ageBasis = "연령 데이터 매칭 필요";
+    return;
+  }
+
+  const total = getAgeNumber(row, "총인구수");
+  const age3050 =
+    getAgeNumber(row, "30~39세") +
+    getAgeNumber(row, "40~49세") +
+    getAgeNumber(row, "50~59세");
+
+  if (!total || !age3050) {
+    DATA.demand.age3050ratio = null;
+    DATA.demand.ageBasis = "연령 데이터 확인 필요";
+    return;
+  }
+
+  DATA.demand.age3050ratio = Math.round((age3050 / total) * 1000) / 10;
+  DATA.demand.ageBasis = basis;
+  DATA.demand.ageRegion = cleanRegionName(row["행정구역"]);
+}
+
+function applyBuildingData(buildingResponse) {
+  const item = normalizeItems(buildingResponse?.data?.response?.body?.items)[0];
+
+  if (!item) return;
+
+  const inferredType = inferBuildingType(item);
+  DATA.building.type = inferredType;
+
+  if (item.mainPurpsCdNm) DATA.building.mainUse = item.mainPurpsCdNm;
+
+  if (item.useAprDay) {
+    DATA.building.approvedYear = Number(String(item.useAprDay).slice(0, 4)) || DATA.building.approvedYear;
+  }
+
+  const grndFlrCnt = toNumber(item.grndFlrCnt);
+  const ugrndFlrCnt = toNumber(item.ugrndFlrCnt);
+
+  if (grndFlrCnt) {
+    DATA.building.floor = `지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
+  }
+
+  const areaM2 = toNumber(item.totArea || item.archArea);
+  if (areaM2) {
+    DATA.building.areaPy = Math.round((areaM2 / 3.3058) * 10) / 10;
+  }
+
+  const parkingCnt = toNumber(item.indrAutoUtcnt) + toNumber(item.oudrAutoUtcnt);
+  if (parkingCnt > 0) {
+    DATA.building.parking = `주차 ${parkingCnt}대 (건축물대장 기준)`;
+  }
+
+  if (item.jibunAddr || item.platPlc) {
+    DATA.building.landUse = item.jibunAddr ? "건축물대장 소재지 확인" : DATA.building.landUse;
+  }
+}
+
+function applyPlacesData({ martRes, hospitalRes, schoolRes, subwayRes, outletRes, deptRes, martKeywordRes, apartmentRes }) {
+  const anchors = [];
+  const placeTotal = res => res?.totalCount ?? res?.count ?? (res?.items?.length || 0);
+
+  const martItems = martRes?.items || [];
+  const martTotal = placeTotal(martRes);
+  if (martTotal) {
+    const top = martItems[0];
+    anchors.push(["대형마트", top
+      ? `${top.place_name} (${formatDistance(top.distance)}) · 반경 5km ${martTotal}개소`
+      : `반경 5km ${martTotal}개소`]);
+  }
+
+  const hospitalCount = placeTotal(hospitalRes);
+  if (hospitalCount) {
+    const top = hospitalRes.items?.[0];
+    anchors.push(["병원", top
+      ? `반경 5km ${hospitalCount}개소 · 최근접 ${top.place_name} (${formatDistance(top.distance)})`
+      : `반경 5km ${hospitalCount}개소`]);
+  }
+
+  const schoolCount = placeTotal(schoolRes);
+  if (schoolCount) {
+    const top = schoolRes.items?.[0];
+    anchors.push(["교육", top
+      ? `반경 5km ${schoolCount}개소 · 최근접 ${top.place_name} (${formatDistance(top.distance)})`
+      : `반경 5km ${schoolCount}개소`]);
+  }
+
+  const subwayCount = placeTotal(subwayRes);
+  if (subwayCount) {
+    const top = subwayRes.items?.[0];
+    anchors.push(["교통", top
+      ? `${top.place_name} (${formatDistance(top.distance)}) · 반경 5km 역 ${subwayCount}개소`
+      : `반경 5km 역 ${subwayCount}개소`]);
+  }
+
+  DATA.traffic.anchors = anchors.length
+    ? anchors
+    : [["주변시설", "반경 5km 내 주요 집객 시설 조회 결과 없음"]];
+
+  DATA.traffic.bizType = subwayCount
+    ? "대중교통·생활상권 복합권"
+    : (martCount => martCount ? "주거 배후·마트 연계 상권" : "지역 상권")(martItems.length);
+
+  DATA.traffic.metrics = {
+    subwayDistM: subwayRes?.items?.[0]?.distance != null ? Number(subwayRes.items[0].distance) : null,
+    subwayCount: subwayCount || 0,
+    martDistM: martItems[0]?.distance != null ? Number(martItems[0].distance) : null,
+    martCount: martTotal || 0,
+    hospitalDistM: hospitalRes?.items?.[0]?.distance != null ? Number(hospitalRes.items[0].distance) : null,
+    hospitalCount: hospitalCount || 0,
+    schoolDistM: schoolRes?.items?.[0]?.distance != null ? Number(schoolRes.items[0].distance) : null,
+    schoolCount: schoolCount || 0
+  };
+
+  const aptCount = apartmentRes?.meta?.pageable_count || apartmentRes?.totalCount || apartmentRes?.count || 0;
+  DATA.demand.aptComplexes = aptCount || null;
+
+  DATA.building.anchorSummary = anchors.map(a => `${a[0]}: ${a[1]}`).join(" / ");
+
+  const landmarkPool = [
+    ...(outletRes?.items || []),
+    ...(deptRes?.items || []),
+    ...(martKeywordRes?.items || []).filter(m => !martItems.some(t => t.place_name === m.place_name))
+  ];
+
+  const seen = new Set();
+  DATA.landmarks = landmarkPool
+    .filter(item => {
+      if (seen.has(item.place_name)) return false;
+      seen.add(item.place_name);
+      return true;
+    })
+    .slice(0, 6)
+    .map(item => [
+      item.place_name,
+      (item.category_name || "쇼핑·집객").split(" > ").pop(),
+      formatDistance(item.distance),
+      "반경 5km 내 광역·특색 집객 시설"
+    ]);
+}
+
+let WAREHOUSE_BRANDS_CACHE = null;
+
+async function loadWarehouseBrands() {
+  if (WAREHOUSE_BRANDS_CACHE) return WAREHOUSE_BRANDS_CACHE;
+  try {
+    const res = await fetch("/data/warehouse_pharmacy_brands.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("브랜드 DB 로드 실패");
+    WAREHOUSE_BRANDS_CACHE = await res.json();
+  } catch {
+    WAREHOUSE_BRANDS_CACHE = {
+      searchKeywords: ["창고형약국", "메가팩토리", "메가타운", "기가약국", "메디킹덤"],
+      nameContains: ["메가팩토리", "메가타운", "기가약국", "창고형"],
+      namePatterns: ["창고형", "마트형", "메가타운", "메가팩토리"],
+      excludeContains: ["수의", "동물", "한의"]
+    };
+  }
+  return WAREHOUSE_BRANDS_CACHE;
+}
+
+function normalizePlaceText(value) {
+  return String(value || "").replace(/\s+/g, "").toLowerCase();
+}
+
+function classifyWarehousePharmacy(place, brands) {
+  const name = place?.place_name || "";
+  const category = place?.category_name || "";
+  const text = normalizePlaceText(`${name} ${category}`);
+  const db = brands || WAREHOUSE_BRANDS_CACHE || {};
+
+  for (const ex of db.excludeContains || []) {
+    if (text.includes(normalizePlaceText(ex))) {
+      return { isWarehouse: false, matchReason: null };
+    }
+  }
+
+  for (const token of db.nameContains || []) {
+    if (text.includes(normalizePlaceText(token))) {
+      return { isWarehouse: true, matchReason: `상호·카테고리 키워드: ${token}` };
+    }
+  }
+
+  for (const pattern of db.namePatterns || []) {
+    if (text.includes(normalizePlaceText(pattern))) {
+      return { isWarehouse: true, matchReason: `패턴 매칭: ${pattern}` };
+    }
+  }
+
+  for (const legacy of CONFIG.WAREHOUSE_PHARMACY_NAMES || []) {
+    if (legacy && text.includes(normalizePlaceText(legacy))) {
+      return { isWarehouse: true, matchReason: `레거시 키워드: ${legacy}` };
+    }
+  }
+
+  return { isWarehouse: false, matchReason: null };
+}
+
+function isHBStore(place) {
+  const name = normalizePlaceText(place?.place_name);
+  const category = place?.category_name || "";
+  if (category.includes("화장품") || category.includes("생활용품")) return true;
+  return (CONFIG.HB_KEYWORDS || []).some(kw => name.includes(normalizePlaceText(kw)));
+}
+
+function isGeneralPharmacy(place) {
+  const category = place?.category_name || "";
+  const name = place?.place_name || "";
+  if (classifyWarehousePharmacy(place).isWarehouse) return false;
+  return category.includes("약국") || /약국/.test(name);
+}
+
+function dedupePlaces(list) {
+  const seen = new Map();
+  for (const item of list || []) {
+    const key = `${item.x},${item.y},${item.place_name}`;
+    if (!seen.has(key)) seen.set(key, item);
+  }
+  return [...seen.values()];
+}
+
+function unwrapPlacesResult(result) {
+  if (!result || result.error) return { items: [], totalCount: 0 };
+  return {
+    items: result.items || [],
+    totalCount: result.totalCount ?? result.count ?? (result.items?.length || 0)
+  };
+}
+
+async function searchPlacesBundle(x, y, radius, brands) {
+  const keywords = [...new Set([
+    ...(brands.searchKeywords || []),
+    ...(CONFIG.WAREHOUSE_PHARMACY_NAMES || [])
+  ])].filter(Boolean);
+
+  const tasks = [
+    safeApi("약국", () => callPlacesApi({ x, y, category: "PM9", radius, maxPages: "2" })),
+    ...keywords.map(kw =>
+      safeApi(kw, () => callPlacesApi({ x, y, keyword: kw, radius, maxPages: "2" }))
+    ),
+    ...(CONFIG.HB_KEYWORDS || []).map(kw =>
+      safeApi(kw, () => callPlacesApi({ x, y, keyword: kw, radius, maxPages: "1" }))
+    )
+  ];
+
+  const results = await Promise.all(tasks);
+  const allItems = dedupePlaces(results.flatMap(r => unwrapPlacesResult(r).items));
+
+  const warehouseStores = [];
+  const pharmacyPlaces = [];
+  const hbPlaces = [];
+
+  for (const item of allItems) {
+    const wh = classifyWarehousePharmacy(item, brands);
+    if (wh.isWarehouse) {
+      warehouseStores.push({ ...item, matchReason: wh.matchReason });
+      continue;
+    }
+    if (isHBStore(item)) {
+      hbPlaces.push(item);
+      continue;
+    }
+    if (isGeneralPharmacy(item)) {
+      pharmacyPlaces.push(item);
+    }
+  }
+
+  const warehouseUnique = [...new Map(warehouseStores.map(p => [p.place_name, p])).values()]
+    .sort((a, b) => Number(a.distance || 0) - Number(b.distance || 0));
+  const hbUnique = [...new Map(hbPlaces.map(p => [p.place_name, p])).values()];
+  const phUnique = [...new Map(pharmacyPlaces.map(p => [p.place_name, p])).values()];
+
+  const pm9 = unwrapPlacesResult(results[0]);
+  const pharmacies = Math.max(pm9.totalCount || 0, phUnique.length);
+
+  return {
+    pharmacies,
+    warehouse: warehouseUnique.length,
+    hnb: hbUnique.length,
+    warehouseStores: warehouseUnique,
+    pharmacyItems: phUnique,
+    hbItems: hbUnique,
+    pm9Total: pm9.totalCount || 0
+  };
+}
+
+function bucketCompetitionByRadius(bundle) {
+  const limits = { "1km": 1000, "2km": 2000, "5km": 5000 };
+  const out = {};
+
+  for (const [key, maxM] of Object.entries(limits)) {
+    const wh = (bundle.warehouseStores || []).filter(p => Number(p.distance || 99999) <= maxM);
+    const hb = (bundle.hbItems || []).filter(p => Number(p.distance || 99999) <= maxM);
+    const ph = (bundle.pharmacyItems || []).filter(p => Number(p.distance || 99999) <= maxM);
+
+    out[key] = {
+      pharmacies: key === "5km"
+        ? Math.max(bundle.pm9Total || 0, ph.length)
+        : ph.length,
+      warehouse: wh.length,
+      hnb: hb.length,
+      warehouseStores: wh
+    };
+  }
+
+  return out;
+}
+
+async function fetchCompetitionData(x, y) {
+  const brands = await loadWarehouseBrands();
+  const bundle = await searchPlacesBundle(x, y, "5000", brands);
+  return bucketCompetitionByRadius(bundle);
+}
+
+async function safeApi(label, fn) {
+  try {
+    return await fn();
+  } catch (error) {
+    return { error: `${label}: ${error.message}` };
+  }
+}
+
+async function runPublicDataAnalysis(kakaoResult) {
+  const addr = $("addrInput").value.trim();
+  const errors = [];
+  let params = getAddressParamsFromKakao(kakaoResult);
+
+  DATA.address = params.fullAddress || addr;
+  DATA.mapCenter = { lat: params.lat, lng: params.lng };
+  DATA.price.rentPerPy = null;
+  DATA.price.rentSource = null;
+  DATA.price.salePerPy = 0;
+  DATA.price.deals = [];
+  DATA.price.deals12mo = 0;
+
+  await loadWarehouseBrands();
+  setAnalysisStatus("기본 정보 조회 중...");
+
+  const [jusoWrap, tradeWrap, buildingWrap, landuseWrap, landCharWrap] = await Promise.all([
+    safeApi("주소 검색", () => callJusoApi(addr)),
+    safeApi("상업용 실거래", () => callTradeApi(params)),
+    safeApi("건축물대장", () => callBuildingApi(params)),
+    safeApi("토지이용계획", () => callLanduseApi(params)),
+    safeApi("토지특성", () => callLandCharacteristicsApi(params)),
+  ]);
+
+  if (jusoWrap?.error) errors.push(jusoWrap.error);
+  if (buildingWrap?.error) errors.push(buildingWrap.error);
+
+  params = applyJusoParams(params, jusoWrap?.error ? null : jusoWrap);
+
+  let populationWrap = null;
+  if (params.roadNmCd) {
+    populationWrap = await safeApi("인구·세대", () => callPopulationApi(params));
+    if (populationWrap?.error) errors.push(populationWrap.error);
+  } else if (jusoWrap && !jusoWrap.error) {
+    errors.push("인구·세대: 도로명코드를 찾지 못했습니다.");
+  }
+
+  const x = String(params.lng);
+  const y = String(params.lat);
+
+  setAnalysisStatus("주변 시설 조회 중...");
+
+  const placeLabels = [
+    ["mart", () => callPlacesApi({ x, y, category: "MT1" }), "대형마트"],
+    ["hospital", () => callPlacesApi({ x, y, category: "HP8" }), "병원"],
+    ["school", () => callPlacesApi({ x, y, category: "SC4" }), "교육시설"],
+    ["subway", () => callPlacesApi({ x, y, category: "SW8" }), "지하철"],
+    ["outlet", () => callPlacesApi({ x, y, keyword: "아울렛" }), "아울렛"],
+    ["dept", () => callPlacesApi({ x, y, keyword: "백화점" }), "백화점"],
+    ["martKw", () => callPlacesApi({ x, y, keyword: "이마트" }), "마트(키워드)"],
+    ["apt", () => callPlacesApi({ x, y, keyword: "아파트" }), "아파트"]
+  ];
+
+  const placeSettled = await Promise.all(
+    placeLabels.map(async ([key, fn, label]) => {
+      const wrap = await safeApi(label, fn);
+      return { key, label, wrap };
+    })
+  );
+
+  const placeResults = {};
+  for (const { key, label, wrap } of placeSettled) {
+    if (wrap?.error) errors.push(wrap.error);
+    else placeResults[key] = wrap;
+  }
+
+  setAnalysisStatus("경쟁 환경 분석 중...");
+
+  const [competitionWrap, ageWrap] = await Promise.all([
+    safeApi("경쟁 환경", () => fetchCompetitionData(x, y)),
+    safeApi("연령별 인구", () => applyAgePopulationData(params, addr)),
+  ]);
+  if (competitionWrap?.error) errors.push(competitionWrap.error);
+  if (ageWrap?.error) errors.push(ageWrap.error);
+
+  if (buildingWrap && !buildingWrap.error) applyBuildingData(buildingWrap);
+  else DATA.building.type = inferBuildingTypeFromAddress(addr);
+
+  if (landuseWrap && !landuseWrap.error && landuseWrap.ok !== false) applyLanduseData(landuseWrap);
+
+  if (landCharWrap && !landCharWrap.error && landCharWrap.ok !== false) {
+    applyLandCharacteristicsData(landCharWrap);
+  }
+
+  if (tradeWrap && !tradeWrap.error && tradeWrap.ok !== false) await applyTradeData(tradeWrap, params);
+
+  if (!DATA.price.deals.length) {
+    applyBackupTradeData(params);
+  }
+
+  if (populationWrap && !populationWrap.error) applyPopulationData(populationWrap);
+
+  applyPlacesData({
+    martRes: placeResults.mart,
+    hospitalRes: placeResults.hospital,
+    schoolRes: placeResults.school,
+    subwayRes: placeResults.subway,
+    outletRes: placeResults.outlet,
+    deptRes: placeResults.dept,
+    martKeywordRes: placeResults.martKw,
+    apartmentRes: placeResults.apt
+  });
+
+  const placeInferred = inferBuildingTypeFromPlaces({
+    outletRes: placeResults.outlet,
+    deptRes: placeResults.dept,
+    martRes: placeResults.mart
+  });
+
+  if (placeInferred && (buildingWrap?.error || !normalizeItems(buildingWrap?.data?.response?.body?.items).length)) {
+    DATA.building.type = placeInferred;
+  }
+
+  applyRentEstimate();
+  if (competitionWrap && !competitionWrap.error) DATA.competition = competitionWrap;
+
+  DATA.quality = {
+    geocode: !!(params.lat && params.lng),
+    building: !!(buildingWrap && !buildingWrap.error),
+    trade: !!(tradeWrap && !tradeWrap.error && tradeWrap.ok !== false && DATA.price.deals12mo > 0),
+    population: !!(populationWrap && !populationWrap.error),
+    places: Object.keys(placeResults).length >= 5,
+    competition: !!(competitionWrap && !competitionWrap.error),
+    landuse: !!(landuseWrap && !landuseWrap.error && landuseWrap.ok !== false)
+  };
+
+  render();
+
+  if (errors.length) {
+    alert(`분석은 완료했으나 일부 API 오류가 있습니다.\n\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? `\n…외 ${errors.length - 5}건` : ""}`);
+  }
+}
+
+$("runBtn").addEventListener("click", async ()=>{
+  const addr = $("addrInput").value.trim();
+
+  if (!addr) {
+    alert("주소를 입력해 주세요.");
+    return;
+  }
+
+  setAnalysisStatus("분석 중...");
+  $("runBtn").disabled = true;
+
+  try {
+    if (!CONFIG.KAKAO_JS_KEY) {
+      alert("카카오 JavaScript 키가 설정되지 않았습니다. CONFIG.KAKAO_JS_KEY를 확인해 주세요.");
+      return;
+    }
+
+    setAnalysisStatus("지도 SDK 로드 중...");
+    await loadKakaoSDK();
+
+    setAnalysisStatus("주소 좌표 변환 중...");
+    const kakaoResult = await geocodeInputAddress(addr);
+    await runPublicDataAnalysis(kakaoResult);
+  } catch (error) {
+    console.error(error);
+    alert(error.message || "분석 중 오류가 발생했습니다.");
+  } finally {
+    resetRunButton();
+  }
+});
+$("modeInternal").addEventListener("click", ()=>{
+  document.body.classList.remove("external");
+  $("modeInternal").classList.add("on"); $("modeExternal").classList.remove("on");
+});
+$("modeExternal").addEventListener("click", ()=>{
+  document.body.classList.add("external");
+  $("modeExternal").classList.add("on"); $("modeInternal").classList.remove("on");
+});
+if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
+
+/* ---- 접속 코드 게이트 ---- */
+function unlock(){
+  $("gate").style.display = "none";
+  sessionStorage.setItem("ps_ok", "1");
+}
+function tryGate(){
+  if (!CONFIG.ACCESS_CODE) { unlock(); return; }
+  if ($("gateInput").value === CONFIG.ACCESS_CODE) unlock();
+  else { $("gateErr").style.visibility = "visible"; $("gateInput").value = ""; $("gateInput").focus(); }
+}
+$("gateBtn").addEventListener("click", tryGate);
+$("gateInput").addEventListener("keydown", e => { if (e.key === "Enter") tryGate(); });
+if (!CONFIG.ACCESS_CODE || sessionStorage.getItem("ps_ok") === "1") unlock();
+else $("gateInput").focus();
+
+render();
+</script>
+</body>
+</html>

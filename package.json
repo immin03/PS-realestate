@@ -1,0 +1,12 @@
+{
+  "name": "phamasquare-site-report",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "config": "node scripts/generate-config.js",
+    "dev:fn": "npx --yes netlify-cli functions:serve -f netlify/functions -p 9000 --offline",
+    "dev:web": "node dev-server.mjs",
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run dev"
+  }
+}

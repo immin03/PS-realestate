@@ -1,0 +1,9 @@
+[build]
+  command = "node scripts/generate-config.js"
+  publish = "."
+  functions = "netlify/functions"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
