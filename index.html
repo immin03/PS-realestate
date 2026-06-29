@@ -127,6 +127,12 @@
   .site-field-unit{ padding:0 10px 0 2px; font-size:12px; font-weight:500; color:var(--gray); white-space:nowrap; }
   .site-field.from-registry .site-field-lbl::after{ content:" · 대장"; color:var(--ok); font-weight:600; }
   .site-field.needs-input .site-field-lbl::after{ content:" · 입력 필요"; color:var(--amber); font-weight:600; }
+  .site-field-readonly{
+    display:flex; align-items:center; height:40px; padding:0 12px;
+    border:1px solid var(--hairline); border-radius:8px; background:var(--wash);
+    font-size:14px; font-weight:600; color:var(--ink); white-space:nowrap;
+  }
+  .site-field-readonly.muted{ color:var(--gray); font-weight:500; }
   .site-detail-lease{ margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
   .site-detail-lease .site-field-lbl{ flex-shrink:0; }
   .site-detail-lease.needs-input #leaseFloorFieldLbl::after{ content:" · 입력 필요"; color:var(--amber); font-weight:600; }
@@ -453,10 +459,14 @@ const TYPE_PROFILES = {
     <span class="site-detail-hint" id="siteDetailHint">분석 후 건축물대장 조회 결과가 채워집니다. 미조회 항목만 직접 입력하세요.</span>
   </div>
   <div class="site-detail-fields">
-    <label class="site-field" id="areaFieldWrap" title="임대 전용면적(평) — 가맹 손익 산정용">
+    <div class="site-field" id="bldgAreaFieldWrap" title="건축물대장 연면적(건물 전체)">
+      <span class="site-field-lbl">건물 총면적</span>
+      <div class="site-field-readonly muted" id="bldgAreaDisplay">분석 후 표시</div>
+    </div>
+    <label class="site-field" id="areaFieldWrap" title="임대·운영 전용면적(평) — 가맹 손익 산정용 · 직접 입력">
       <span class="site-field-lbl">출점평수</span>
       <div class="site-field-input">
-        <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="입력" inputmode="numeric" aria-label="출점평수">
+        <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="예: 180" inputmode="numeric" aria-label="출점평수">
         <span class="site-field-unit">평</span>
       </div>
     </label>
@@ -481,7 +491,7 @@ const TYPE_PROFILES = {
     <span class="lease-floor-hint">복수 선택 · 1층 포함 시 접근성 가산</span>
   </div>
 </div>
-<p class="demo-note" id="demoNote">주소를 입력한 뒤 <b>분석</b>을 실행하세요. 출점평수·층수·주차대수·출점층은 분석 후 건축물대장에서 자동 채워지며, 미조회 항목만 직접 입력합니다.</p>
+<p class="demo-note" id="demoNote">주소를 입력한 뒤 <b>분석</b>을 실행하세요. <b>건물 총면적</b>은 대장에서 자동 조회되고, <b>출점평수</b>(임대 전용면적)는 직접 입력합니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -942,7 +952,9 @@ function clearManualInputsForNewAddress() {
   DATA.building.leaseFloors = [];
   DATA.building.leaseFloorLabel = "";
   DATA.building.leaseFloorManual = false;
+  DATA.building.areaPy = 0;
   resolveParkingDisplay();
+  syncBldgAreaDisplay();
 }
 
 let lastAddrContext = "";
@@ -972,10 +984,9 @@ function updateSiteDetailFieldStates() {
   const lease = getSelectedLeaseFloorIds().length;
   const parkingTouched = $("parkingInput")?.dataset.userTouched === "1";
   const bldgTouched = $("bldgFloorInput")?.dataset.userTouched === "1";
-  const areaTouched = $("areaInput")?.dataset.userTouched === "1";
 
-  setSiteFieldState("areaFieldWrap",
-    !areaPy ? "missing" : (!areaTouched && DATA.building.areaPy > 0 ? "registry" : "manual"));
+  setSiteFieldState("areaFieldWrap", !areaPy ? "missing" : "manual");
+  syncBldgAreaDisplay();
   setSiteFieldState("bldgFloorFieldWrap",
     !bldg ? "missing" : (!bldgTouched && DATA.building.bldgFloorCnt > 0 ? "registry" : "manual"));
   setSiteFieldState("parkingFieldWrap",
@@ -1003,8 +1014,9 @@ function applySavedInputsWhereMissing(ctx) {
   if (!ctx) return;
 
   const area = $("areaInput");
-  if (area && !toNumber(area.value) && ctx.areaPy > 0) {
-    area.value = String(ctx.areaPy);
+  const leasePy = ctx.leaseAreaPy ?? ctx.areaPy;
+  if (area && !toNumber(area.value) && leasePy > 0) {
+    area.value = String(leasePy);
     if (ctx.areaTouched) area.dataset.userTouched = "1";
   }
 
@@ -1674,16 +1686,31 @@ function getEffectiveLeaseAreaPy(building) {
   if (input >= (CONFIG.FRANCHISE_ECONOMICS?.MIN_AREA_PY || 80)) return input;
   const lease = toNumber(building?.leaseAreaPy);
   if (lease > 0) return lease;
-  const bldg = toNumber(building?.areaPy);
-  if (bldg > 0) return bldg;
   return CONFIG.FRANCHISE_ECONOMICS?.REF_AREA_PY || 180;
 }
 
-function syncAreaInputFromBuilding() {
-  const el = $("areaInput");
-  if (!el || toNumber(el.value) > 0 || el.dataset.userTouched === "1") return;
+function getEnteredLeaseAreaPy() {
+  const input = toNumber($("areaInput")?.value);
+  if (input >= (CONFIG.FRANCHISE_ECONOMICS?.MIN_AREA_PY || 80)) return input;
+  return toNumber(DATA.building?.leaseAreaPy) || 0;
+}
+
+function syncBldgAreaDisplay() {
+  const el = $("bldgAreaDisplay");
+  const wrap = $("bldgAreaFieldWrap");
   const py = toNumber(DATA.building?.areaPy);
-  if (py > 0) el.value = String(Math.round(py));
+  if (!el) return;
+  if (py > 0) {
+    el.textContent = `${fmt(py)}평`;
+    el.classList.remove("muted");
+    wrap?.classList.add("from-registry");
+    wrap?.classList.remove("needs-input");
+  } else {
+    el.textContent = "미조회";
+    el.classList.add("muted");
+    wrap?.classList.remove("from-registry");
+    wrap?.classList.add("needs-input");
+  }
 }
 
 function computeLocationSalesMultiplier(trafficMetrics) {
@@ -1867,7 +1894,7 @@ function scorePhysicalV2(building, max, trafficMetrics) {
   const floorAccess = scoreLeaseFloorAccess(building);
   if (floorAccess > 0) s += floorAccess;
 
-  const area = toNumber(building.areaPy);
+  const area = getEffectiveLeaseAreaPy(building);
   if (area >= ideal) s += 0.28;
   else if (area >= minPy) s += 0.18;
   else if (area >= floorPy) s += 0.08;
@@ -1942,7 +1969,8 @@ function collectScoreBlockers(data) {
   metrics.hnb2km = metrics.hnb2km || data.competition?.["2km"]?.hnb || 0;
   if (!hasParking(b) && !detectHNBColocationStrategy(metrics)) blockers.push("no_parking");
   if (!isFranchiseStoreModel() && rent != null && rent > benchmark * 2) blockers.push("rent_high");
-  if (toNumber(b.areaPy) > 0 && toNumber(b.areaPy) < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
+  const leasePy = getEnteredLeaseAreaPy();
+  if (leasePy > 0 && leasePy < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
     blockers.push("area_small");
   }
   return blockers;
@@ -2183,11 +2211,11 @@ function normalizeRecentEntry(item) {
 }
 
 function captureAnalysisInputs() {
-  const areaPy = toNumber($("areaInput")?.value);
+  const leaseAreaPy = toNumber($("areaInput")?.value);
   const bldgFloor = toNumber($("bldgFloorInput")?.value);
   const parking = toNumber($("parkingInput")?.value);
   return {
-    areaPy: areaPy > 0 ? areaPy : 0,
+    leaseAreaPy: leaseAreaPy > 0 ? leaseAreaPy : 0,
     areaTouched: $("areaInput")?.dataset.userTouched === "1",
     bldgFloor: bldgFloor > 0 ? bldgFloor : 0,
     bldgFloorTouched: $("bldgFloorInput")?.dataset.userTouched === "1",
@@ -2308,7 +2336,7 @@ function buildInternalMemo(scoreResult, d) {
       if (oversat) return `${pct}점${zone ? ` · ${zone}` : ""} — 약국 과밀(1km ${ph1}개소), 프리미엄 상권 아님`;
       return `${pct}점${zone ? ` · ${zone}` : ""}`;
     })()],
-    ["물리 조건", `${getBuildingFloorDisplay(b)} · ${b.parking || "주차 미확인"} · ${b.areaPy ? b.areaPy + "평" : "면적 확인 필요"}`],
+    ["물리 조건", `${getBuildingFloorDisplay(b)} · ${b.parking || "주차 미확인"} · 건물 ${b.areaPy ? fmt(b.areaPy) + "평" : "—"} / 출점 ${getEnteredLeaseAreaPy() || "입력"}평`],
     ["계약 구조", "상표 사용·운영 협력 계약(수수료) + 컨설팅 계약"],
     ["오픈 가능 시점", "계약 후 약 5개월 (설계·인테리어·상품 세팅 포함)"],
     ["내부 리스크", blockers.length ? blockers.join(", ") : "자동 상한 리스크 없음 — 현장 실사로 최종 확인"]
@@ -2366,7 +2394,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
   return (
     `[내부 검토] ${dm.note} · ${b.type} · ${total}점(${grade}). ` +
     `1km 창고형 ${c1.warehouse} · 2km ${c2.warehouse} · 5km 약국 ${c5.pharmacies}. ` +
-    `${getBuildingFloorDisplay(b)}·${parkingLabel}·면적 ${b.areaPy || "미확인"}평. ` +
+    `${getBuildingFloorDisplay(b)}·${parkingLabel}·건물 ${b.areaPy ? fmt(b.areaPy) + "평" : "미확인"} / 출점 ${getEnteredLeaseAreaPy() || "입력"}평. ` +
     (rentPerPy == null
       ? (isFranchiseStoreModel() ? `임대 시세 추정 불가 — 사업성·임대 전망 보수 적용. ` : `임대료 추정 불가 — 경제성 점수 보수 적용. `)
       : (isFranchiseStoreModel() ? `인근 시세 ${rentPerPy}만원/평 — 사업성·임대 전망 축 반영. ` : `임대 ${rentPerPy}만원/평 — ${rentOk ? "기준 이내" : "기준 초과"}. `)) +
@@ -2386,7 +2414,8 @@ function render(){
   $("mDate").textContent = dateStr;
   $("ftrDate").textContent = dateStr + " 작성";
 
-  const leasePyBadge = getEffectiveLeaseAreaPy(b);
+  const leasePyBadge = getEnteredLeaseAreaPy();
+  const bldgAreaPy = toNumber(b.areaPy);
 
   /* I. 개요 + 유형 분석 */
   $("bldgBadges").innerHTML =
@@ -2394,10 +2423,12 @@ function render(){
     (b.registryMissing && !b.bldgFloorManual && !b.leaseFloorManual ? `<span class="badge alert">건축물대장 미등록 — 출점층·건물층수·주차 입력</span>` : "") +
     (b.type === "지식산업센터" ? `<span class="badge alert">용도 제약 검토 필요</span>` : "") +
     `<span class="badge soft">${b.mainUse}</span>` +
-    `<span class="badge soft">${getBuildingFloorDisplay(b)} · ${leasePyBadge ? `분석면적 약 ${leasePyBadge}평` : "임대 전용면적 확인 필요"}</span>` +
+    `<span class="badge soft">${getBuildingFloorDisplay(b)}${bldgAreaPy ? ` · 건물 총 ${fmt(bldgAreaPy)}평` : ""}${leasePyBadge ? ` · 출점 ${leasePyBadge}평` : " · 출점평수 입력 필요"}</span>` +
     (b.approvedYear ? `<span class="badge soft">사용승인 ${b.approvedYear}년</span>` : "");
   $("bldgTable").innerHTML = [
     ["용도지역", b.landUse],
+    ["건물 총면적", bldgAreaPy ? `약 ${fmt(bldgAreaPy)}평 (건축물대장 연면적)` : "건축물대장 미조회"],
+    ["출점 면적", leasePyBadge ? `약 ${leasePyBadge}평 (임대·운영 전용)` : "상단 출점평수 입력"],
     ["출점 층", b.leaseFloorLabel || "출점층 미선택 — 상단에서 선택"],
     ["건물 규모", b.bldgFloorLabel || b.floor || "확인 필요"],
     ["주차", b.parking],
@@ -2514,9 +2545,11 @@ function render(){
           : leasePy >= 120
             ? `표준 모델 대비 면적이 다릅니다. 평당 매출·비용을 면적에 맞게 조정해 추정했습니다.`
             : `면적이 작아 표준 모델(180평) 대비 효율이 낮을 수 있습니다.`)
-       : (b.areaPy >= 200
-          ? "건축물대장상 면적은 확인되었으나, 실제 임대 전용면적은 현장/임대조건 확인이 필요합니다."
-          : "실제 임대 전용면적 확인 후 표준 모델 적용 가능 여부를 재검토해야 합니다.")],
+       : (getEnteredLeaseAreaPy() >= 150
+          ? `출점 면적 ${getEnteredLeaseAreaPy()}평 기준입니다. 건물 총면적(대장) ${b.areaPy ? fmt(b.areaPy) + "평" : "미조회"}과 별도입니다.`
+          : b.areaPy >= 200
+          ? `건물 총면적(대장) 약 ${fmt(b.areaPy)}평 — 출점평수(임대 전용)는 상단에서 입력해 주세요.`
+          : "출점평수(임대 전용면적) 입력 후 표준 모델 적용 가능 여부를 재검토해야 합니다.")],
     [dm.households5km >= householdThreshold ? "ok" : "cond",
      householdLabel,
      dm.households5km >= householdThreshold
@@ -4211,6 +4244,7 @@ function applyBuildingData(buildingResponse) {
   const areaM2 = toNumber(item.totArea || item.archArea);
   if (areaM2) {
     DATA.building.areaPy = Math.round((areaM2 / 3.3058) * 10) / 10;
+    syncBldgAreaDisplay();
   }
 
   const parkAgg = sumParkingFromRegistryItems(items);
@@ -4687,7 +4721,7 @@ async function runPublicDataAnalysis(kakaoResult) {
     DATA.building.registryMissing = true;
   }
   applyBuildingManualOverrides();
-  syncAreaInputFromBuilding();
+  syncBldgAreaDisplay();
   buildLeaseFloorChips();
   applySavedInputsWhereMissing(pendingSiteContext);
   pendingSiteContext = null;
