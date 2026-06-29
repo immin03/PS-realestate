@@ -33,7 +33,18 @@ window.APP_CONFIG = {
       MART_IDEAL_M: 800,
       MART_GOOD_M: 2500,
       FOOT_TRAFFIC_DEMAND_BLEND: 0.38,
-      TOURISM_TRAFFIC_BOOST: 0.22
+      TOURISM_TRAFFIC_BOOST: 0.22,
+      SOFT_CORRIDOR_FOOT_CAP: 0.36,
+      SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP: 0.5,
+      SOFT_CORRIDOR_SUBWAY_WEIGHT: 0.1,
+      SUBURBAN_TRAFFIC_CAP: 0.48,
+      SUBURBAN_FOOT_CAP: 0.32,
+      FOOT_TRAFFIC_SCORE_CAPS: [
+        [0.2, 0.4],
+        [0.28, 0.48],
+        [0.36, 0.56],
+        [0.44, 0.66]
+      ]
     },
     COMPETITION: {
       HNB_HIGH_THRESHOLD: 18,
@@ -46,17 +57,19 @@ window.APP_CONFIG = {
       HNB_BEAUTY_COMP_PER: 0.005,
       HNB_BEAUTY_COMP_CAP: 0.09,
       BEAUTY_PRODUCT_SHARE: 0.3,
-      PREMIUM_VITALITY_MIN: 0.4,
+      PREMIUM_VITALITY_MIN: 0.52,
       PREMIUM_SCORE_FLOOR: 0.48,
       PREMIUM_SCORE_FLOOR_BOOST: 0.32,
+      PHARMACY_OVERSAT_1KM: 14,
+      PHARMACY_OVERSAT_2KM: 26,
       HUB_PHARMACY_SWEET_MIN: 3,
-      HUB_PHARMACY_SWEET_MAX: 30,
+      HUB_PHARMACY_SWEET_MAX: 12,
       HUB_PHARMACY_BONUS: 0.09,
       RETAIL_ECOSYSTEM_HNB_MIN: 5,
       RETAIL_ECOSYSTEM_BONUS: 0.04,
       SYNERGY_BONUS_MAX: 4,
-      SOFT_CORRIDOR_VITALITY_CAP: 0.46,
-      SOFT_CORRIDOR_STRICT_CAP: 0.4
+      SOFT_CORRIDOR_VITALITY_CAP: 0.34,
+      SOFT_CORRIDOR_STRICT_CAP: 0.28
     },
     MEGA_HUB_KEYWORDS: [
       "명동", "을지로", "광화문", "종로", "동대문", "강남대로", "강남역", "서울역", "잠실", "코엑스", "여의도"
@@ -64,8 +77,12 @@ window.APP_CONFIG = {
     SOFT_CORRIDOR_KEYWORDS: [
       "가로수", "신사동", "신사역", "도산대로", "도산"
     ],
+    SUBURBAN_KEYWORDS: [
+      "미사", "하남", "파주", "김포", "일산", "산본", "동탄", "광주", "이천", "여주",
+      "양평", "의정부", "구리", "남양주", "시흥", "안산", "수원", "용인", "오산", "평택"
+    ],
     PREMIUM_DISTRICT_KEYWORDS: [
-      "성수", "강남", "신사", "홍대", "이태원", "압구정", "청담",
+      "성수", "강남", "홍대", "이태원", "압구정", "청담",
       "역삼", "한남", "삼성", "선릉", "논현", "건대", "왕십리", "판교", "분당"
     ],
     PHYSICAL: {
