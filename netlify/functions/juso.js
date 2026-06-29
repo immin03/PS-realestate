@@ -63,7 +63,9 @@ exports.handler = async function (event) {
         rn: item.rn,
         udrtYn: item.udrtYn,
         buldMnnm: item.buldMnnm,
-        buldSlno: item.buldSlno
+        buldSlno: item.buldSlno,
+        lnbrMnnm: item.lnbrMnnm,
+        lnbrSlno: item.lnbrSlno
       })),
       requestUrl: url.replace(JUSO_API_KEY, "HIDDEN_KEY")
     });

@@ -95,6 +95,41 @@
     background:var(--ink); border-color:var(--ink); color:#fff;
   }
   .lease-floor-hint{ font-size:11px; color:#999; flex:1 1 100%; }
+  .site-detail-bar{
+    max-width:var(--page-max); margin:12px auto 0; padding:14px var(--page-pad);
+    background:var(--paper); border:1px solid var(--hairline); border-radius:10px;
+    display:none;
+  }
+  body.site-analyzed .site-detail-bar{ display:block; }
+  .site-detail-head{ display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 12px; margin-bottom:12px; }
+  .site-detail-title{ font-size:13px; font-weight:700; color:var(--ink); }
+  .site-detail-hint{ font-size:12px; color:var(--gray); }
+  .site-detail-fields{ display:flex; flex-wrap:wrap; gap:10px; align-items:flex-end; }
+  .site-field{
+    display:flex; flex-direction:column; gap:4px; min-width:88px;
+  }
+  .site-field-lbl{ font-size:11px; font-weight:700; color:var(--gray); letter-spacing:0.02em; }
+  .site-field-input{
+    display:flex; align-items:center; height:40px;
+    border:1px solid var(--hairline); border-radius:8px; background:var(--paper);
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .site-field-input:focus-within{ border-color:var(--ink); box-shadow:0 0 0 3px rgba(17,17,17,0.06); }
+  .site-field-input input{
+    border:none; background:transparent; width:64px; height:100%;
+    padding:0 4px 0 10px; font-size:14px; font-weight:600; font-family:inherit;
+    text-align:right; color:var(--ink); -moz-appearance:textfield;
+  }
+  .site-field-input input::-webkit-outer-spin-button,
+  .site-field-input input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+  .site-field-input input::placeholder{ font-weight:400; color:#b0b0b0; }
+  .site-field-input input:focus{ outline:none; }
+  .site-field-unit{ padding:0 10px 0 2px; font-size:12px; font-weight:500; color:var(--gray); white-space:nowrap; }
+  .site-field.from-registry .site-field-lbl::after{ content:" · 대장"; color:var(--ok); font-weight:600; }
+  .site-field.needs-input .site-field-lbl::after{ content:" · 입력 필요"; color:var(--amber); font-weight:600; }
+  .site-detail-lease{ margin-top:12px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+  .site-detail-lease .site-field-lbl{ flex-shrink:0; }
+  .site-detail-lease.needs-input #leaseFloorFieldLbl::after{ content:" · 입력 필요"; color:var(--amber); font-weight:600; }
   .btn{ height:42px; padding:0 18px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff;
         font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
   .btn.ghost{ background:var(--paper); color:var(--ink); border-color:var(--hairline); font-weight:500; }
@@ -253,7 +288,7 @@
       margin:14mm 12mm 22mm 12mm;
     }
     body{ background:#fff; }
-    #gate,.page-chrome,.lease-floor-bar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
+    #gate,.page-chrome,.site-detail-bar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
     .sheet{ border:none; margin:0; max-width:none; padding:24px 8px 32px; }
     section{ margin-top:28px; }
     #map{ height:300px; }
@@ -400,19 +435,6 @@ const TYPE_PROFILES = {
     <button class="btn" id="runBtn">분석</button>
   </div>
   <div class="toolbar-row toolbar-row-options">
-    <div class="search-group">
-    <label class="area-field" title="임대 전용면적(평) — 가맹(건물주) 손익 산정용">
-      <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="180" inputmode="numeric" aria-label="면적(평)">
-      <span class="area-suffix">평</span>
-    </label>
-    <label class="area-field" title="건물 전체 지상 층수 — 건축물대장 미등록(신축) 시 입력">
-      <input type="number" id="bldgFloorInput" min="1" max="99" step="1" placeholder="건물" inputmode="numeric" aria-label="건물 지상 층수">
-      <span class="area-suffix">층</span>
-    </label>
-    <label class="area-field" title="주차 대수 — 건축물대장 미등록 시 입력">
-      <input type="number" id="parkingInput" min="0" max="9999" step="1" placeholder="자동" inputmode="numeric" aria-label="주차 대수">
-    </label>
-    </div>
   <div class="store-model" title="출점 검토 기준을 선택합니다">
     <button id="storeDirect" class="on">직영 출점</button>
     <button id="storeFranchise">가맹 출점</button>
@@ -425,12 +447,41 @@ const TYPE_PROFILES = {
   </div>
   </div>
 </div>
-<div class="lease-floor-bar" id="leaseFloorBar">
-  <span class="lease-floor-label">출점층</span>
-  <div class="floor-chips" id="leaseFloorChips" role="group" aria-label="출점·임대 대상 층 (복수 선택)"></div>
-  <span class="lease-floor-hint">복수 선택 가능 · 1층 포함 시 접근성 가산</span>
+<div class="site-detail-bar" id="siteDetailBar">
+  <div class="site-detail-head">
+    <span class="site-detail-title">건물·출점 조건</span>
+    <span class="site-detail-hint" id="siteDetailHint">분석 후 건축물대장 조회 결과가 채워집니다. 미조회 항목만 직접 입력하세요.</span>
+  </div>
+  <div class="site-detail-fields">
+    <label class="site-field" id="areaFieldWrap" title="임대 전용면적(평) — 가맹 손익 산정용">
+      <span class="site-field-lbl">출점평수</span>
+      <div class="site-field-input">
+        <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="입력" inputmode="numeric" aria-label="출점평수">
+        <span class="site-field-unit">평</span>
+      </div>
+    </label>
+    <label class="site-field" id="bldgFloorFieldWrap" title="건물 전체 지상 층수">
+      <span class="site-field-lbl">층수</span>
+      <div class="site-field-input">
+        <input type="number" id="bldgFloorInput" min="1" max="99" step="1" placeholder="입력" inputmode="numeric" aria-label="건물 지상 층수">
+        <span class="site-field-unit">층</span>
+      </div>
+    </label>
+    <label class="site-field" id="parkingFieldWrap" title="주차 대수 — 대장 미조회 시 직접 입력">
+      <span class="site-field-lbl">주차대수</span>
+      <div class="site-field-input">
+        <input type="number" id="parkingInput" min="0" max="9999" step="1" placeholder="입력" inputmode="numeric" aria-label="주차 대수">
+        <span class="site-field-unit">대</span>
+      </div>
+    </label>
+  </div>
+  <div class="site-detail-lease">
+    <span class="site-field-lbl" id="leaseFloorFieldLbl">출점층</span>
+    <div class="floor-chips" id="leaseFloorChips" role="group" aria-label="출점·임대 대상 층 (복수 선택)"></div>
+    <span class="lease-floor-hint">복수 선택 · 1층 포함 시 접근성 가산</span>
+  </div>
 </div>
-<p class="demo-note" id="demoNote">주소는 <b>도로명·지번 자동완성</b>으로 정확히 선택하세요. 평수·출점층·건물층수·주차 입력 후 <b>분석</b>을 누르세요.</p>
+<p class="demo-note" id="demoNote">주소를 입력한 뒤 <b>분석</b>을 실행하세요. 출점평수·층수·주차대수·출점층은 분석 후 건축물대장에서 자동 채워지며, 미조회 항목만 직접 입력합니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -723,6 +774,7 @@ function buildLeaseFloorChips() {
       btn.classList.toggle("on");
       btn.setAttribute("aria-pressed", btn.classList.contains("on"));
       applyBuildingManualOverrides();
+      updateSiteDetailFieldStates();
       rerenderIfAnalyzed();
     });
   });
@@ -859,11 +911,16 @@ function normalizeAddrKey(addr) {
 }
 
 function clearManualInputsForNewAddress() {
+  const area = $("areaInput");
   const pin = $("parkingInput");
   const bldg = $("bldgFloorInput");
+  if (area) {
+    area.value = "";
+    delete area.dataset.userTouched;
+  }
   if (pin) {
     pin.value = "";
-    pin.placeholder = "자동";
+    pin.placeholder = "입력";
     delete pin.dataset.userTouched;
     delete pin.dataset.autoFilled;
   }
@@ -889,6 +946,95 @@ function clearManualInputsForNewAddress() {
 
 let lastAddrContext = "";
 let lastAnalyzedAddrKey = "";
+let pendingSiteContext = null;
+
+function showSiteDetailBar() {
+  document.body.classList.add("site-analyzed");
+  updateSiteDetailFieldStates();
+}
+
+function hideSiteDetailBar() {
+  document.body.classList.remove("site-analyzed");
+}
+
+function setSiteFieldState(wrapId, source) {
+  const wrap = $(wrapId);
+  if (!wrap) return;
+  wrap.classList.toggle("from-registry", source === "registry");
+  wrap.classList.toggle("needs-input", source === "missing");
+}
+
+function updateSiteDetailFieldStates() {
+  const areaPy = toNumber($("areaInput")?.value);
+  const bldg = toNumber($("bldgFloorInput")?.value);
+  const park = toNumber($("parkingInput")?.value) || toNumber(DATA.building.parkingRegistry);
+  const lease = getSelectedLeaseFloorIds().length;
+  const parkingTouched = $("parkingInput")?.dataset.userTouched === "1";
+  const bldgTouched = $("bldgFloorInput")?.dataset.userTouched === "1";
+  const areaTouched = $("areaInput")?.dataset.userTouched === "1";
+
+  setSiteFieldState("areaFieldWrap",
+    !areaPy ? "missing" : (!areaTouched && DATA.building.areaPy > 0 ? "registry" : "manual"));
+  setSiteFieldState("bldgFloorFieldWrap",
+    !bldg ? "missing" : (!bldgTouched && DATA.building.bldgFloorCnt > 0 ? "registry" : "manual"));
+  setSiteFieldState("parkingFieldWrap",
+    !park ? "missing" : (!parkingTouched && DATA.building.parkingRegistry > 0 ? "registry" : "manual"));
+
+  const leaseWrap = $("leaseFloorFieldLbl")?.closest(".site-detail-lease");
+  if (leaseWrap) {
+    leaseWrap.classList.toggle("needs-input", !lease);
+  }
+
+  const hint = $("siteDetailHint");
+  if (hint) {
+    const missing = [];
+    if (!areaPy) missing.push("출점평수");
+    if (!bldg) missing.push("층수");
+    if (!park) missing.push("주차대수");
+    if (!lease) missing.push("출점층");
+    hint.textContent = missing.length
+      ? `미조회: ${missing.join(" · ")} — 직접 입력하면 리포트가 갱신됩니다.`
+      : "건축물대장 조회 결과가 반영되었습니다. 필요 시 수정할 수 있습니다.";
+  }
+}
+
+function applySavedInputsWhereMissing(ctx) {
+  if (!ctx) return;
+
+  const area = $("areaInput");
+  if (area && !toNumber(area.value) && ctx.areaPy > 0) {
+    area.value = String(ctx.areaPy);
+    if (ctx.areaTouched) area.dataset.userTouched = "1";
+  }
+
+  const bldg = $("bldgFloorInput");
+  if (bldg && !toNumber(bldg.value) && ctx.bldgFloor > 0) {
+    bldg.value = String(ctx.bldgFloor);
+    if (ctx.bldgFloorTouched) bldg.dataset.userTouched = "1";
+  }
+
+  buildLeaseFloorChips();
+  if (!getSelectedLeaseFloorIds().length && ctx.leaseFloors?.length) {
+    const want = new Set(ctx.leaseFloors);
+    document.querySelectorAll("#leaseFloorChips .floor-chip").forEach(btn => {
+      const on = want.has(btn.dataset.floor);
+      btn.classList.toggle("on", on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+  }
+
+  const pin = $("parkingInput");
+  if (pin && !toNumber(pin.value) && !toNumber(DATA.building.parkingRegistry)) {
+    if (ctx.parkingTouched && ctx.parking > 0) {
+      pin.value = String(ctx.parking);
+      pin.dataset.userTouched = "1";
+    } else if (ctx.parking > 0) {
+      pin.value = String(ctx.parking);
+      if (ctx.parkingAutoFilled) pin.dataset.autoFilled = "1";
+    }
+  }
+  applyBuildingManualOverrides();
+}
 
 function onAddressContextChange(newAddr) {
   const next = String(newAddr || "").trim();
@@ -903,6 +1049,8 @@ function onAddressContextChange(newAddr) {
 
   if (hasPriorAnalysis && nextKey !== analyzedKey) {
     clearManualInputsForNewAddress();
+    hideSiteDetailBar();
+    pendingSiteContext = null;
     rerenderIfAnalyzed();
   }
   lastAddrContext = next;
@@ -1532,7 +1680,7 @@ function getEffectiveLeaseAreaPy(building) {
 
 function syncAreaInputFromBuilding() {
   const el = $("areaInput");
-  if (!el || toNumber(el.value) > 0) return;
+  if (!el || toNumber(el.value) > 0 || el.dataset.userTouched === "1") return;
   const py = toNumber(DATA.building?.areaPy);
   if (py > 0) el.value = String(Math.round(py));
 }
@@ -2020,11 +2168,47 @@ function loadRecentSearches() {
   }
 }
 
+function normalizeRecentEntry(item) {
+  if (typeof item === "string") {
+    const addr = String(item || "").trim();
+    return { addr, addrKey: normalizeAddrKey(addr), context: null };
+  }
+  const addr = String(item?.addr || "").trim();
+  return {
+    addr,
+    addrKey: item?.addrKey || normalizeAddrKey(addr),
+    context: item?.context || null
+  };
+}
+
+function captureAnalysisInputs() {
+  const areaPy = toNumber($("areaInput")?.value);
+  const bldgFloor = toNumber($("bldgFloorInput")?.value);
+  const parking = toNumber($("parkingInput")?.value);
+  return {
+    areaPy: areaPy > 0 ? areaPy : 0,
+    areaTouched: $("areaInput")?.dataset.userTouched === "1",
+    bldgFloor: bldgFloor > 0 ? bldgFloor : 0,
+    bldgFloorTouched: $("bldgFloorInput")?.dataset.userTouched === "1",
+    parking: parking > 0 ? parking : 0,
+    parkingTouched: $("parkingInput")?.dataset.userTouched === "1",
+    parkingAutoFilled: $("parkingInput")?.dataset.autoFilled === "1",
+    leaseFloors: getSelectedLeaseFloorIds()
+  };
+}
+
 function saveRecentSearch(addr) {
   const trimmed = String(addr || "").trim();
   if (!trimmed) return;
-  const list = loadRecentSearches().filter(a => a !== trimmed);
-  list.unshift(trimmed);
+  const entry = {
+    addr: trimmed,
+    addrKey: normalizeAddrKey(trimmed),
+    context: captureAnalysisInputs()
+  };
+  const list = loadRecentSearches()
+    .map(normalizeRecentEntry)
+    .filter(e => e.addrKey !== entry.addrKey);
+  list.unshift(entry);
   localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list.slice(0, 8)));
   renderRecentSearches();
 }
@@ -2032,7 +2216,7 @@ function saveRecentSearch(addr) {
 function renderRecentSearches() {
   const box = $("recentSearches");
   if (!box) return;
-  const list = loadRecentSearches();
+  const list = loadRecentSearches().map(normalizeRecentEntry);
   if (!list.length) {
     box.style.display = "none";
     return;
@@ -2040,12 +2224,15 @@ function renderRecentSearches() {
   box.style.display = "flex";
   box.innerHTML =
     `<span class="lbl">최근 검색</span>` +
-    list.map(a => `<button type="button" title="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("");
+    list.map(e => `<button type="button" title="${escapeHtml(e.addr)}">${escapeHtml(e.addr)}</button>`).join("");
   box.querySelectorAll("button").forEach((btn, i) => {
     btn.addEventListener("click", () => {
-      onAddressContextChange(list[i]);
-      $("addrInput").value = list[i];
-      $("runBtn").click();
+      const entry = list[i];
+      onAddressContextChange(entry.addr);
+      $("addrInput").value = entry.addr;
+      pendingSiteContext = entry.context;
+      hideAddrSuggest();
+      $("addrInput")?.focus();
     });
   });
 }
@@ -2973,19 +3160,39 @@ function toNumber(value) {
 }
 
 function parseJibunFromAddress(addressName) {
-  const match = String(addressName || "").match(/(\d+)(?:-(\d+))?/);
-
-  if (!match) {
+  const s = String(addressName || "");
+  const afterDong = s.match(/(?:동|리|읍|면|가)\s+(\d+)(?:\s*-\s*(\d+))?\s*$/);
+  if (afterDong) {
     return {
-      bun: "0000",
-      ji: "0000"
+      bun: afterDong[1].padStart(4, "0"),
+      ji: (afterDong[2] || "0").padStart(4, "0")
     };
   }
+  const tail = s.match(/(\d+)(?:\s*-\s*(\d+))?\s*$/);
+  if (tail) {
+    return {
+      bun: tail[1].padStart(4, "0"),
+      ji: (tail[2] || "0").padStart(4, "0")
+    };
+  }
+  return { bun: "0000", ji: "0000" };
+}
 
-  return {
-    bun: match[1].padStart(4, "0"),
-    ji: (match[2] || "0").padStart(4, "0")
-  };
+function applyJibunFromJuso(params, jusoItem) {
+  if (!jusoItem) return params;
+  if (jusoItem.lnbrMnnm != null && String(jusoItem.lnbrMnnm) !== "") {
+    params.bun = String(jusoItem.lnbrMnnm).padStart(4, "0");
+    params.ji = String(jusoItem.lnbrSlno || "0").padStart(4, "0");
+    return params;
+  }
+  if (jusoItem.jibunAddr) {
+    const jibun = parseJibunFromAddress(jusoItem.jibunAddr);
+    if (jibun.bun !== "0000") {
+      params.bun = jibun.bun;
+      params.ji = jibun.ji;
+    }
+  }
+  return params;
 }
 
 function getAddressParamsFromKakao(result) {
@@ -3071,15 +3278,7 @@ function applyJusoParams(params, jusoResult) {
     params.lawdCd = first.admCd.slice(0, 5);
     params.bCode = first.admCd;
   }
-  // 주의: first.buldMnnm/buldSlno는 도로명 건물번호입니다.
-  // 건축물대장 API의 bun/ji는 지번 본번/부번이므로 여기서 덮어쓰면 안 됩니다.
-  if (first.jibunAddr) {
-    const jibun = parseJibunFromAddress(first.jibunAddr);
-    if (jibun.bun !== "0000") {
-      params.bun = jibun.bun;
-      params.ji = jibun.ji;
-    }
-  }
+  applyJibunFromJuso(params, first);
   if (first.roadAddr) params.fullAddress = first.roadAddr;
   return params;
 }
@@ -3140,22 +3339,54 @@ function buildParamsFromJusoItem(base, jusoItem) {
     p.lawdCd = jusoItem.admCd.slice(0, 5);
     p.bCode = jusoItem.admCd;
   }
-  if (jusoItem.jibunAddr) {
-    const jibun = parseJibunFromAddress(jusoItem.jibunAddr);
-    if (jibun.bun !== "0000") {
-      p.bun = jibun.bun;
-      p.ji = jibun.ji;
-    }
-  }
+  applyJibunFromJuso(p, jusoItem);
   if (jusoItem.roadAddr) p.fullAddress = jusoItem.roadAddr;
   return p;
+}
+
+function scoreBuildingRegistryItem(item) {
+  const park = extractParkingFromRegistry(item).total;
+  const flr = toNumber(item.grndFlrCnt);
+  const area = toNumber(item.totArea || item.archArea);
+  const name = String(item.bldNm || item.mainPurpsCdNm || "");
+  let bonus = 0;
+  if (/지식|센터|타워|빌딩/.test(name)) bonus += 50;
+  return park * 20 + flr * 8 + area + bonus;
+}
+
+function pickBestBuildingRegistryItem(items) {
+  if (!items?.length) return null;
+  if (items.length === 1) return items[0];
+  return items.reduce((best, item) =>
+    scoreBuildingRegistryItem(item) > scoreBuildingRegistryItem(best) ? item : best, items[0]);
+}
+
+function sumParkingFromRegistryItems(items) {
+  let total = 0;
+  let auto = 0;
+  let mech = 0;
+  for (const item of items) {
+    const p = extractParkingFromRegistry(item);
+    total += p.total;
+    auto += p.auto;
+    mech += p.mech;
+  }
+  const detail = [];
+  if (auto > 0) detail.push(`자주식 ${auto}대`);
+  if (mech > 0) detail.push(`기계식 ${mech}대`);
+  return {
+    total,
+    label: total > 0
+      ? `주차 ${total}대 (건축물대장${items.length > 1 ? ` · ${items.length}동 합산` : ""}${detail.length ? " · " + detail.join(" · ") : ""})`
+      : null
+  };
 }
 
 function buildingRegistryHasItems(wrap) {
   return normalizeItems(wrap?.data?.response?.body?.items).length > 0;
 }
 
-async function resolveBuildingRegistry(params, jusoWrap) {
+async function resolveBuildingRegistry(params, jusoWrap, addr = "") {
   const tries = [];
   const seen = new Set();
   const pushTry = (p) => {
@@ -3166,8 +3397,10 @@ async function resolveBuildingRegistry(params, jusoWrap) {
   };
 
   pushTry(params);
+  const fromAddr = parseJibunFromAddress(addr);
+  if (fromAddr.bun !== "0000") pushTry({ ...params, ...fromAddr });
   if (jusoWrap?.first) pushTry(buildParamsFromJusoItem(params, jusoWrap.first));
-  for (const item of (jusoWrap?.items || []).slice(0, 5)) {
+  for (const item of (jusoWrap?.items || []).slice(0, 8)) {
     pushTry(buildParamsFromJusoItem(params, item));
   }
 
@@ -3909,7 +4142,8 @@ async function applyAgePopulationData(params, addr) {
 }
 
 function applyBuildingData(buildingResponse) {
-  const item = normalizeItems(buildingResponse?.data?.response?.body?.items)[0];
+  const items = normalizeItems(buildingResponse?.data?.response?.body?.items);
+  const item = pickBestBuildingRegistryItem(items);
 
   DATA.building.registryMissing = !item;
 
@@ -3933,7 +4167,7 @@ function applyBuildingData(buildingResponse) {
   if (grndFlrCnt) {
     DATA.building.floor = `지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
     DATA.building.bldgFloorCnt = grndFlrCnt;
-    DATA.building.bldgFloorLabel = `건물 지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
+    DATA.building.bldgFloorLabel = `건물 지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}${grndFlrCnt >= 10 ? " · 신축 고층" : ""}`;
     const bldgInp = $("bldgFloorInput");
     if (bldgInp && bldgInp.dataset.userTouched !== "1") {
       bldgInp.value = String(grndFlrCnt);
@@ -3946,11 +4180,12 @@ function applyBuildingData(buildingResponse) {
     DATA.building.areaPy = Math.round((areaM2 / 3.3058) * 10) / 10;
   }
 
-  const park = extractParkingFromRegistry(item);
+  const parkAgg = sumParkingFromRegistryItems(items);
+  const park = parkAgg.total > 0 ? parkAgg : extractParkingFromRegistry(item);
   if (park.total > 0) {
     DATA.building.parkingRegistry = park.total;
-    DATA.building.parkingRegistryLabel = park.label;
-    DATA.building.parking = park.label;
+    DATA.building.parkingRegistryLabel = park.label || parkAgg.label;
+    DATA.building.parking = DATA.building.parkingRegistryLabel;
     DATA.building.parkingManual = false;
     syncParkingInputFromRegistry(park.total);
   }
@@ -4351,7 +4586,7 @@ async function runPublicDataAnalysis(kakaoResult) {
 
   params = applyJusoParams(params, jusoWrap?.error ? null : jusoWrap);
 
-  const buildingResolved = await safeApi("건축물대장", () => resolveBuildingRegistry(params, jusoWrap?.error ? null : jusoWrap));
+  const buildingResolved = await safeApi("건축물대장", () => resolveBuildingRegistry(params, jusoWrap?.error ? null : jusoWrap, addr));
   const buildingWrap = buildingResolved?.wrap;
   if (buildingResolved?.params) params = { ...params, ...buildingResolved.params };
 
@@ -4421,6 +4656,8 @@ async function runPublicDataAnalysis(kakaoResult) {
   applyBuildingManualOverrides();
   syncAreaInputFromBuilding();
   buildLeaseFloorChips();
+  applySavedInputsWhereMissing(pendingSiteContext);
+  pendingSiteContext = null;
   const syncedArea = toNumber($("areaInput")?.value);
   if (syncedArea > 0) DATA.building.leaseAreaPy = syncedArea;
 
@@ -4479,6 +4716,8 @@ async function runPublicDataAnalysis(kakaoResult) {
   render();
   setStepProgress("finish", 100);
   lastAnalyzedAddrKey = DATA.address;
+  showSiteDetailBar();
+  updateSiteDetailFieldStates();
   saveRecentSearch(addr);
 
   if (errors.length) {
@@ -4543,21 +4782,39 @@ $("storeFranchise").addEventListener("click", ()=>{
   if (DATA.address && DATA.address !== "—") render();
 });
 $("areaInput")?.addEventListener("change", () => {
-  const py = toNumber($("areaInput")?.value);
-  if (py > 0) DATA.building.leaseAreaPy = py;
+  const el = $("areaInput");
+  const py = toNumber(el?.value);
+  if (py > 0) {
+    el.dataset.userTouched = "1";
+    DATA.building.leaseAreaPy = py;
+  } else {
+    delete el.dataset.userTouched;
+  }
+  updateSiteDetailFieldStates();
   if (DATA.address && DATA.address !== "—" && DATA.address !== "주소를 입력하고 분석을 실행하세요") render();
 });
 $("areaInput")?.addEventListener("input", () => {
-  const py = toNumber($("areaInput")?.value);
-  if (py > 0) DATA.building.leaseAreaPy = py;
+  const el = $("areaInput");
+  const py = toNumber(el?.value);
+  if (py > 0) {
+    el.dataset.userTouched = "1";
+    DATA.building.leaseAreaPy = py;
+  } else {
+    delete el.dataset.userTouched;
+  }
+  updateSiteDetailFieldStates();
 });
 function rerenderIfAnalyzed() {
-  if (DATA.address && DATA.address !== "—" && DATA.address !== "주소를 입력하고 분석을 실행하세요") render();
+  if (DATA.address && DATA.address !== "—" && DATA.address !== "주소를 입력하고 분석을 실행하세요") {
+    updateSiteDetailFieldStates();
+    render();
+  }
 }
 ["bldgFloorInput", "parkingInput"].forEach(id => {
   $(id)?.addEventListener("change", () => {
     if (id === "bldgFloorInput") buildLeaseFloorChips();
     applyBuildingManualOverrides();
+    updateSiteDetailFieldStates();
     rerenderIfAnalyzed();
   });
   $(id)?.addEventListener("input", () => {
@@ -4570,6 +4827,7 @@ function rerenderIfAnalyzed() {
       el.dataset.userTouched = "1";
     }
     applyBuildingManualOverrides();
+    updateSiteDetailFieldStates();
   });
 });
 buildLeaseFloorChips();
