@@ -45,6 +45,24 @@
     .toolbar .search-group{ flex:1 1 100%; min-width:100%; }
     .area-field{ flex:0 0 96px; }
   }
+  .lease-floor-bar{
+    max-width:900px; margin:10px auto 0; padding:0 16px;
+    display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
+  }
+  .lease-floor-label{
+    font-size:12px; font-weight:600; color:var(--gray); white-space:nowrap;
+  }
+  .floor-chips{ display:flex; flex-wrap:wrap; gap:6px; flex:1; min-width:0; }
+  .floor-chip{
+    height:32px; padding:0 11px; border-radius:999px; border:1px solid var(--hairline);
+    background:var(--paper); font-size:12px; font-weight:600; color:var(--gray);
+    cursor:pointer; font-family:inherit; transition:all .12s ease;
+  }
+  .floor-chip:hover{ border-color:#bbb; color:var(--ink); }
+  .floor-chip.on{
+    background:var(--ink); border-color:var(--ink); color:#fff;
+  }
+  .lease-floor-hint{ font-size:11px; color:#999; flex:1 1 100%; }
   .btn{ height:42px; padding:0 18px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff;
         font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
   .btn.ghost{ background:var(--paper); color:var(--ink); border-color:var(--hairline); font-weight:500; }
@@ -203,7 +221,7 @@
       margin:14mm 12mm 22mm 12mm;
     }
     body{ background:#fff; }
-    #gate,.toolbar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
+    #gate,.toolbar,.lease-floor-bar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
     .sheet{ border:none; margin:0; max-width:none; padding:24px 8px 32px; }
     section{ margin-top:28px; }
     #map{ height:300px; }
@@ -272,7 +290,7 @@ const TYPE_PROFILES = {
     factor: 1.0,
     trait: "주거지 인접 가로·근린 상권. 배후 세대 규모와 주차·접근성이 매출을 좌우하는, 창고형 모델의 표준 입지 유형입니다.",
     stages: [
-      ["대상 건물 조건", d => `임대 전용면적 <b>확인 필요</b> · ${d.floor}, ${d.parking} — 건축물대장 기본정보는 확인되었으나, 실제 임대 전용면적은 임대 호실 및 계약조건 확인이 필요합니다.`],
+      ["대상 건물 조건", d => `임대 전용면적 <b>확인 필요</b> · ${getBuildingFloorDisplay(d)}, ${d.parking} — 건축물대장 기본정보는 확인되었으나, 실제 임대 전용면적은 임대 호실 및 계약조건 확인이 필요합니다.`],
       ["인근 상권 구성", d => `${d.anchorSummary||"인근 집객 시설은 IV장 참조."}`],
       ["배후 주거 인구", d => `반경 5km 주거 <b>${fmt(d.households5km)}세대</b> — 반복 방문 수요의 핵심 기반입니다.`]
     ]
@@ -347,6 +365,13 @@ const TYPE_PROFILES = {
       <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="180" inputmode="numeric" aria-label="면적(평)">
       <span class="area-suffix">평</span>
     </label>
+    <label class="area-field" title="건물 전체 지상 층수 — 건축물대장 미등록(신축) 시 입력">
+      <input type="number" id="bldgFloorInput" min="1" max="99" step="1" placeholder="건물" inputmode="numeric" aria-label="건물 지상 층수">
+      <span class="area-suffix">층</span>
+    </label>
+    <label class="area-field" title="주차 대수 — 건축물대장 미등록 시 입력">
+      <input type="number" id="parkingInput" min="0" max="999" step="1" placeholder="주차" inputmode="numeric" aria-label="주차 대수">
+    </label>
   </div>
   <button class="btn" id="runBtn">분석</button>
   <div class="store-model" title="출점 검토 기준을 선택합니다">
@@ -359,7 +384,12 @@ const TYPE_PROFILES = {
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
 </div>
-<p class="demo-note" id="demoNote">주소·<b>평수</b>·출점 기준을 선택한 뒤 <b>분석</b>을 누르세요. 가맹(건물주) 모드는 도심형 180평 기준 손익을 바탕으로 <b>공실 시 임대 대비 수익</b>을 추정합니다.</p>
+<div class="lease-floor-bar" id="leaseFloorBar">
+  <span class="lease-floor-label">출점층</span>
+  <div class="floor-chips" id="leaseFloorChips" role="group" aria-label="출점·임대 대상 층 (복수 선택)"></div>
+  <span class="lease-floor-hint">복수 선택 가능 · 1층 포함 시 접근성 가산</span>
+</div>
+<p class="demo-note" id="demoNote">주소·<b>평수</b>·<b>출점층·건물층수·주차</b>를 입력한 뒤 <b>분석</b>을 누르세요. 유동·집객력은 실측 유동인구가 아닌 <b>POI·교통 프록시</b>입니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -398,9 +428,9 @@ const TYPE_PROFILES = {
     <div class="sec-label">II. Overall Feasibility</div>
     <div class="sec-title">종합 적합도</div>
     <div class="sec-lead sec-lead-external direct-tone">5개 평가 축(배후 수요·유동·경쟁·경제성·물리 조건)을 본사 표준 가중치로 합산한 결과입니다. <b>직영 출점</b> 기준으로 임대료·손익 모델 대비 수익성을 반영합니다.</div>
-    <div class="sec-lead sec-lead-external franchise-tone">5개 평가 축을 합산한 결과입니다. <b>가맹 출점(건물주 보유)</b> 기준 <b>Conservative 손익</b>·상권 사업성·임대 전망을 평가합니다. Normal 시나리오는 약 25% 상회할 수 있습니다.</div>
+    <div class="sec-lead sec-lead-external franchise-tone">5개 평가 축을 합산한 결과입니다. <b>가맹 출점(건물주 보유)</b> 기준 상권 사업성·임대 전망을 평가하며, 손익은 <b>Conservative~Normal 예상 구간</b>으로 참고합니다. 등급은 보수(Conservative) 기준입니다.</div>
     <div class="sec-lead sec-lead-internal direct-tone">5개 평가 축 가중 합산(v2) — 직영 기준 임대·손익, 거리 가중 경쟁·리스크 상한 반영.</div>
-    <div class="sec-lead sec-lead-internal franchise-tone">5개 평가 축 가중 합산(v2) — 가맹(건물주) 기준: <b>Conservative</b> 손익으로 사업성·임대 전망 축 산정. 등급은 보수 기준 우선.</div>
+    <div class="sec-lead sec-lead-internal franchise-tone">5개 평가 축 가중 합산(v2) — 가맹(건물주) 기준: 손익은 Conservative~Normal <b>예상 구간</b> 표기, 점수·등급은 Conservative 단일값 산정.</div>
     <div class="verdict-wrap">
       <div class="seal"><div class="g" id="gradeBig">—</div><div class="s">GRADE</div></div>
       <div class="verdict-body">
@@ -411,7 +441,7 @@ const TYPE_PROFILES = {
         <div class="score-note" id="blockerNote" style="display:none; color:var(--warn);"></div>
         <div class="score-note">등급: S 90+ · A 80+ · B 68+ · C 50+ · D 50 미만 · 거리·유형·리스크 가중 v2 모델</div>
         <div class="score-note">
-  ※ 물리 조건은 1층 여부 및 접근성, 매장 면적, 주차(교외·차량 중심 입지 가중), 건물 유형 및 용도 제약 여부를 기준으로 평가합니다. H&B 동선 상권은 보행·집객을 우선합니다.
+  ※ 물리 조건은 <b>출점층</b>(1층·복층 등) 및 접근성, 매장 면적, 주차(교외·차량 중심 입지 가중), 건물 유형 및 용도 제약 여부를 기준으로 평가합니다. H&B 동선 상권은 보행·집객을 우선합니다.
       </div>
     </div>
   </section>
@@ -439,7 +469,7 @@ const TYPE_PROFILES = {
   <section>
     <div class="sec-label">V. Traffic &amp; Anchors</div>
     <div class="sec-title">유동 · 집객력</div>
-    <div class="sec-lead">상권 유형 및 주변 집객 시설 현황입니다.</div>
+    <div class="sec-lead">상권 유형 및 주변 집객 시설 현황입니다. <b>유동·집객력 점수는 실측 유동인구 API가 아니라</b> 카카오 POI·지하철·마트·H&amp;B 밀집도 등 <b>프록시 지표</b>로 추정합니다.</div>
     <div class="grid" id="trafficGrid"></div>
     <table class="kv" id="anchorTable" style="margin-top:14px;"></table>
     <div style="margin-top:22px; font-weight:700; font-size:14px;">대형 시설 · 관광 인프라 <span style="font-weight:400; color:var(--gray); font-size:12px;">(반경 5km 내외 특색 시설)</span></div>
@@ -478,7 +508,7 @@ const TYPE_PROFILES = {
     <div class="sec-title direct-tone">상가 시세 — 실거래가 기준</div>
     <div class="sec-title franchise-tone">상권 시세 · 임대 전망</div>
     <div class="sec-lead direct-tone">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
-    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — <b>도심형 180평 표준 손익(Conservative)</b>을 입력 평수·상권에 맞게 환산해, 인근 임대 시세 대비 <b>직접 운영 수익</b>을 비교합니다(임대료 0원 전제). 종합 점수·아래 수치는 보수 시나리오 기준이며, Normal 가정 시 약 <b>25% 상회</b>할 수 있습니다.</div>
+    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — 도심형 180평 표준 손익을 입력 평수·상권에 맞게 환산합니다. <b>매출·영업이익은 확정값이 아닌 Conservative~Normal 예상 구간</b>으로 표기합니다(임대료 0원 전제).</div>
     <div class="scenario-note franchise-tone" id="franchiseScenarioNote"></div>
     <div class="grid franchise-tone" style="margin-bottom:16px;" id="franchiseEconGrid"></div>
     <div class="grid" style="margin-bottom:16px;" id="priceGrid"></div>
@@ -529,7 +559,8 @@ const EMPTY = {
   address: "주소를 입력하고 분석을 실행하세요",
   building: {
     type: "근린상가",
-    mainUse: "[분석 후 표시]", floor: "[분석 후 표시]", areaPy: 0, leaseAreaPy: 0,
+    mainUse: "[분석 후 표시]", floor: "[분석 후 표시]", leaseFloors: [], leaseFloorLabel: "",
+    bldgFloorLabel: "", areaPy: 0, leaseAreaPy: 0,
     approvedYear: null, parking: "건물 내 주차 가능 여부 및 대수 현장 확인 필요", landUse: "토지이용계획 확인 필요",
     roadFacing: "전면 도로 폭 및 차량 진출입 가능 여부 현장 확인 필요",
     inBldgUnits: null, occupancy: null, workers: null,
@@ -575,6 +606,87 @@ function isFirstFloor(floorText) {
   return /(?:^|[^\d])1층(?!\d)/.test(String(floorText || ""));
 }
 
+function getSelectedLeaseFloorIds() {
+  return [...document.querySelectorAll("#leaseFloorChips .floor-chip.on")].map(b => b.dataset.floor);
+}
+
+function formatLeaseFloorLabel(ids) {
+  if (!ids?.length) return "";
+  const sortKey = id => (id.startsWith("B") ? -parseInt(id.slice(1), 10) : parseInt(id, 10));
+  return [...ids]
+    .sort((a, b) => sortKey(a) - sortKey(b))
+    .map(id => (id.startsWith("B") ? `지하${id.slice(1)}층` : `${id}층`))
+    .join("·");
+}
+
+function getBuildingFloorDisplay(b) {
+  const lease = b?.leaseFloorLabel;
+  const bldg = b?.bldgFloorLabel || (/지상\s*\d+층/.test(String(b?.floor || "")) ? b.floor : "");
+  if (lease && bldg) return `출점 ${lease} · ${bldg}`;
+  if (lease) return `출점 ${lease}`;
+  return b?.floor || "층수 미확인";
+}
+
+function scoreLeaseFloorAccess(building) {
+  const floors = building?.leaseFloors;
+  if (floors?.length) {
+    if (floors.includes("1")) {
+      let s = 0.32;
+      if (floors.length > 1) s += 0.04;
+      return Math.min(0.36, s);
+    }
+    if (floors.includes("2") || floors.includes("B1")) return 0.12;
+    if (floors.includes("B2")) return 0.08;
+    const upper = floors.some(f => !f.startsWith("B") && parseInt(f, 10) >= 3);
+    return upper ? 0.04 : 0.06;
+  }
+  if (isFirstFloor(building?.floor)) return 0.32;
+  if (/2층|지하1|B1/i.test(String(building?.floor || ""))) return 0.12;
+  return 0;
+}
+
+function getLeaseFloorFit(b) {
+  const floors = b?.leaseFloors || [];
+  const label = b?.leaseFloorLabel || getBuildingFloorDisplay(b);
+  if (!floors.length) {
+    return ["cond", "출점 층", "출점층 미선택 — 상단 <b>출점층</b>에서 임대·운영 층을 선택하면 물리 점수에 반영됩니다."];
+  }
+  if (floors.includes("1")) {
+    return ["ok", `출점 층 — ${label}`,
+      floors.length > 1
+        ? `${label} 복층 운영. 1층 포함으로 보행·집객 접근성 가산을 반영했습니다.`
+        : "1층 출점 — 접근성·가시성 우수 구간으로 평가했습니다."];
+  }
+  if (floors.includes("2") || floors.includes("B1")) {
+    return ["cond", `출점 층 — ${label}`, "2층·지하1층 출점 — 1층 대비 접근성·간판 노출을 현장에서 확인하세요."];
+  }
+  return ["no", `출점 층 — ${label}`, "고층·지하2층 위주 — 유동 유입·동선 제약 가능성이 있어 보완 전략이 필요합니다."];
+}
+
+function buildLeaseFloorChips() {
+  const container = $("leaseFloorChips");
+  if (!container) return;
+  const prev = new Set(getSelectedLeaseFloorIds());
+  const maxGrnd = Math.min(30, Math.max(5, toNumber($("bldgFloorInput")?.value) || 5));
+  const options = ["B2", "B1"];
+  for (let i = 1; i <= maxGrnd; i++) options.push(String(i));
+
+  container.innerHTML = options.map(id => {
+    const label = id.startsWith("B") ? `B${id.slice(1)}` : `${id}F`;
+    const on = prev.has(id);
+    return `<button type="button" class="floor-chip${on ? " on" : ""}" data-floor="${id}" aria-pressed="${on}">${label}</button>`;
+  }).join("");
+
+  container.querySelectorAll(".floor-chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      btn.classList.toggle("on");
+      btn.setAttribute("aria-pressed", btn.classList.contains("on"));
+      applyBuildingManualOverrides();
+      rerenderIfAnalyzed();
+    });
+  });
+}
+
 function clamp01(v) {
   return Math.max(0, Math.min(1, Number(v) || 0));
 }
@@ -615,9 +727,80 @@ function warehouseThreat(warehouseStores) {
 }
 
 function hasParking(b) {
+  const manual = toNumber($("parkingInput")?.value);
+  if (manual >= 1) return true;
   const p = String(b?.parking || "");
   if (!p || p.includes("없음") || p.includes("미확보") || p.includes("확인 필요")) return false;
   return true;
+}
+
+function isUrbanCommercialCorridor(address = "") {
+  const addr = String(address || "");
+  const keys = CONFIG.SCORING?.COMMERCIAL_CORRIDOR_KEYWORDS || [];
+  if (keys.some(k => addr.includes(k))) return true;
+  if (/서울/.test(addr) && /시흥(대로|동)/.test(addr)) return true;
+  return false;
+}
+
+function computeCommercialClusterBoost(metrics) {
+  const m = metrics || {};
+  const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
+  const maxBoost = trafficCfg.CORRIDOR_CLUSTER_BOOST_MAX || 0.22;
+  let boost = 0;
+  const hnb2 = m.hnb2km || 0;
+  const martD = Number(m.martDistM);
+  const subwayD = Number(m.subwayDistM);
+  const hospitalD = Number(m.hospitalDistM);
+
+  if (hnb2 >= 8) boost += 0.08;
+  else if (hnb2 >= 4) boost += 0.05;
+  else if (hnb2 >= 2) boost += 0.025;
+
+  if (martD > 0 && martD <= 1200) boost += 0.06;
+  else if (martD > 0 && martD <= 2500) boost += 0.03;
+
+  if (subwayD > 0 && subwayD <= 450) boost += 0.12;
+  else if (subwayD > 0 && subwayD <= 900) boost += 0.08;
+  else if (subwayD > 0 && subwayD <= 1500) boost += 0.04;
+
+  if (hospitalD > 0 && hospitalD <= 700) boost += 0.05;
+  else if (hospitalD > 0 && hospitalD <= 1500) boost += 0.025;
+
+  if ((m.landmarkCount || 0) >= 4) boost += 0.05;
+  else if ((m.landmarkCount || 0) >= 2) boost += 0.03;
+
+  if ((m.population5km || 0) >= 200000) boost += 0.04;
+  else if ((m.population5km || 0) >= 120000) boost += 0.02;
+
+  return Math.min(maxBoost, boost);
+}
+
+function applyBuildingManualOverrides() {
+  const parkingCnt = toNumber($("parkingInput")?.value);
+  if (parkingCnt >= 1) {
+    DATA.building.parking = `주차 ${parkingCnt}대 (현장·입력값)`;
+    DATA.building.parkingManual = true;
+  }
+  const bldgCnt = toNumber($("bldgFloorInput")?.value);
+  if (bldgCnt >= 2) {
+    DATA.building.bldgFloorCnt = bldgCnt;
+    DATA.building.bldgFloorLabel = `건물 지상 ${bldgCnt}층${bldgCnt >= 10 ? " · 신축 고층" : ""}`;
+    DATA.building.bldgFloorManual = true;
+  } else if (!DATA.building.bldgFloorLabel && DATA.building.floor) {
+    const m = String(DATA.building.floor).match(/지상\s*(\d+)\s*층/);
+    if (m) DATA.building.bldgFloorLabel = `건물 지상 ${m[1]}층`;
+  }
+
+  const leaseFloors = getSelectedLeaseFloorIds();
+  if (leaseFloors.length) {
+    DATA.building.leaseFloors = leaseFloors;
+    DATA.building.leaseFloorLabel = formatLeaseFloorLabel(leaseFloors);
+    DATA.building.leaseFloorManual = true;
+  } else {
+    DATA.building.leaseFloors = [];
+    DATA.building.leaseFloorLabel = "";
+    DATA.building.leaseFloorManual = false;
+  }
 }
 
 function isCommercialLandUse(landUse) {
@@ -648,7 +831,8 @@ function classifyAddressZone(address = "") {
   const mega = (CONFIG.SCORING?.MEGA_HUB_KEYWORDS || []).some(k => addr.includes(k));
   const soft = (CONFIG.SCORING?.SOFT_CORRIDOR_KEYWORDS || []).some(k => addr.includes(k));
   const premium = (CONFIG.SCORING?.PREMIUM_DISTRICT_KEYWORDS || []).some(k => addr.includes(k));
-  const suburban = (CONFIG.SCORING?.SUBURBAN_KEYWORDS || []).some(k => addr.includes(k));
+  let suburban = (CONFIG.SCORING?.SUBURBAN_KEYWORDS || []).some(k => addr.includes(k));
+  if (suburban && (isUrbanCommercialCorridor(addr) || /서울/.test(addr))) suburban = false;
   if (mega) return "mega_hub";
   if (soft && !mega && !/강남대로|강남역/.test(addr)) return "soft_corridor";
   if (premium) return "premium";
@@ -669,13 +853,14 @@ function districtZoneLabel(zone) {
 
 function detectSuburbanStrip(metrics, address = "") {
   const addr = String(address || "");
+  if (isUrbanCommercialCorridor(addr) || /서울/.test(addr)) return false;
   const keywords = CONFIG.SCORING?.SUBURBAN_KEYWORDS || [];
   const kwMatch = keywords.some(k => addr.includes(k));
   const tourism = metrics?.tourismPoiCount || 0;
   const dept = metrics?.deptCount || 0;
   const landmarks = metrics?.landmarkCount || 0;
   const weakAttraction = tourism < 2 && dept === 0 && landmarks < 2;
-  const roadCommercial = /대로|로\s*\d|경기/.test(addr) && weakAttraction;
+  const roadCommercial = /경기(도)?/.test(addr) && /대로/.test(addr) && weakAttraction;
   return kwMatch || roadCommercial;
 }
 
@@ -776,7 +961,25 @@ function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
     if (tourismPoi >= 4) s += 0.06;
     if (deptCount > 0) s += 0.08;
     if (landmarkCount >= 2) s += 0.04;
+    s += computeCommercialClusterBoost(metrics) * 0.55;
     return clamp01(Math.min(s, trafficCfg.SUBURBAN_FOOT_CAP || 0.32));
+  }
+
+  if (isUrbanCommercialCorridor(address)) {
+    let s = 0;
+    if (subwayNear) s += 0.26;
+    else if (subwayWalk) s += 0.16;
+    else if (subwayDist != null && Number(subwayDist) <= 1500) s += 0.08;
+    if (subwayCount >= 2) s += 0.05;
+    if (tourismPoi >= 1) s += 0.06;
+    if (tourismPoi >= 3) s += 0.08;
+    if (landmarkCount >= 2) s += 0.07;
+    if (landmarkCount >= 4) s += 0.05;
+    if (deptCount > 0) s += 0.09;
+    if (anchorCount >= 3) s += 0.05;
+    if (population >= 120000) s += 0.04;
+    s += computeCommercialClusterBoost(metrics);
+    return clamp01(Math.min(s, trafficCfg.CORRIDOR_FOOT_CAP || 0.55));
   }
 
   let s = 0;
@@ -820,6 +1023,12 @@ function inferBizType({ subwayCount, martCount, landmarkCount, tourismPoiCount, 
     return martCount
       ? "주거 배후·도로변 상권 (유동 제한)"
       : "교외 도로변 상권 (유동 제한)";
+  }
+
+  if (isUrbanCommercialCorridor(address)) {
+    if (foot >= 0.38 && subwayCount) return "도심 상업축·역세권 복합 상권";
+    if (foot >= 0.32) return "도심 상업축·리테일 집객 상권";
+    return "도심 도로변 상업 상권";
   }
 
   if (zone === "mega_hub" && foot >= 0.45) return "메가 허브·관광 유동 상권";
@@ -896,7 +1105,11 @@ function computeMarketVitality({ address, metrics, traffic, competition, demand 
       : (compCfg.SOFT_CORRIDOR_VITALITY_CAP || 0.34);
     v = Math.min(v, cap);
   } else if (zone === "suburban" || m.suburbanStrip) {
-    v = Math.min(v, 0.32);
+    v = Math.min(v + computeCommercialClusterBoost(m) * 0.35, 0.36);
+  } else if (isUrbanCommercialCorridor(address)) {
+    v += computeCommercialClusterBoost(m) * 0.45;
+    if (subwayNear) v += 0.06;
+    v = Math.min(v, 0.68);
   }
 
   if (detectPharmacyOversaturation(competition, compCfg)) {
@@ -1075,7 +1288,8 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   const m = metrics || traffic.metrics || {};
   const zone = m.districtZone || "general";
   const stagnant = detectCorridorStagnation(m);
-  const suburban = zone === "suburban" || m.suburbanStrip;
+  const corridor = !!m.commercialCorridor;
+  const suburban = (zone === "suburban" || m.suburbanStrip) && !corridor;
   const foot = m.footTrafficProxy || 0;
   const vitality = m.marketVitality || 0;
 
@@ -1120,6 +1334,10 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   }
   if (suburban) {
     composite = Math.min(composite, cfg.SUBURBAN_TRAFFIC_CAP || 0.48);
+  }
+  if (corridor) {
+    composite = Math.max(composite, foot * 0.38 + vitality * 0.12);
+    composite = Math.min(composite, cfg.CORRIDOR_TRAFFIC_CAP || 0.72);
   }
 
   return Math.round(composite * max);
@@ -1259,6 +1477,36 @@ function formatManwon(amount) {
   return `${fmt(Math.round(n))}만원`;
 }
 
+function formatManwonRange(low, high) {
+  const a = Math.round(Number(low) || 0);
+  const b = Math.round(Number(high) || 0);
+  if (!a && !b) return "—";
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (lo === hi) return `약 ${fmt(lo)}만원`;
+  return `약 ${fmt(lo)}~${fmt(hi)}만원`;
+}
+
+function formatPerPyRange(low, high) {
+  const a = Number(low) || 0;
+  const b = Number(high) || 0;
+  if (!a && !b) return "—";
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (Math.abs(lo - hi) < 0.05) return `약 ${lo.toFixed(1)}만원/평`;
+  return `약 ${lo.toFixed(1)}~${hi.toFixed(1)}만원/평`;
+}
+
+function formatRatioRange(low, high) {
+  const a = Number(low);
+  const b = Number(high);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return "—";
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (Math.abs(lo - hi) < 0.01) return `약 ${lo.toFixed(2)}배`;
+  return `약 ${lo.toFixed(2)}~${hi.toFixed(2)}배`;
+}
+
 function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, demand, competition, building) {
   const cfg = CONFIG.SCORING?.FRANCHISE || {};
   const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
@@ -1330,8 +1578,8 @@ function scorePhysicalV2(building, max, trafficMetrics) {
 
   let s = 0.08;
 
-  if (isFirstFloor(building.floor)) s += 0.32;
-  else if (/2층|지하1|B1/i.test(String(building.floor || ""))) s += 0.12;
+  const floorAccess = scoreLeaseFloorAccess(building);
+  if (floorAccess > 0) s += floorAccess;
 
   const area = toNumber(building.areaPy);
   if (area >= ideal) s += 0.28;
@@ -1436,6 +1684,7 @@ function computeFullScore(data) {
     );
     m.corridorStagnant = detectCorridorStagnation(m);
     m.corridorBeautyRetail = detectCorridorBeautyRetail(m);
+    m.commercialCorridor = isUrbanCommercialCorridor(data.address);
     m.suburbanStrip = detectSuburbanStrip(m, data.address);
   }
 
@@ -1719,7 +1968,7 @@ function buildInternalMemo(scoreResult, d) {
       ? (() => {
           const u = scoreResult.franchiseUnitEcon;
           if (!u) return rent == null ? "면적·시세 입력 후 산정" : `인근 시세 ${rent}만원/평`;
-          return `${u.areaPy}평 · Conservative 임대대비 ${u.profitVsRentRatio != null ? u.profitVsRentRatio.toFixed(2) : "—"}배 (Normal 약 ${u.profitVsRentRatioNormal != null ? u.profitVsRentRatioNormal.toFixed(2) : "—"}배)`;
+          return `${u.areaPy}평 · 월매출 ${formatManwonRange(u.monthlySales, u.monthlySalesNormal)} · 월이익 ${formatManwonRange(u.monthlyOpProfit, u.monthlyOpProfitNormal)} · 임대대비 ${formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal)}`;
         })()
       : (rent == null ? "실거래 부족 — 임대료 협상 전제 불명확" : rent <= CONFIG.BENCHMARK_RENT_PER_PY ? `평당 ${rent}만원 — 기준 이내` : `평당 ${rent}만원 — 기준 상회, 협상 필요`)],
     ["창고형 경쟁", c1.warehouse > 0 ? `1km 내 ${c1.warehouse}개소 — 직접 경쟁, 출점 재검토` : `1km 내 미탐지 · 2km ${c2.warehouse || 0}개소`],
@@ -1733,7 +1982,7 @@ function buildInternalMemo(scoreResult, d) {
       if (oversat) return `${pct}점${zone ? ` · ${zone}` : ""} — 약국 과밀(1km ${ph1}개소), 프리미엄 상권 아님`;
       return `${pct}점${zone ? ` · ${zone}` : ""}`;
     })()],
-    ["물리 조건", `${b.floor || "층수 미확인"} · ${b.parking || "주차 미확인"} · ${b.areaPy ? b.areaPy + "평" : "면적 확인 필요"}`],
+    ["물리 조건", `${getBuildingFloorDisplay(b)} · ${b.parking || "주차 미확인"} · ${b.areaPy ? b.areaPy + "평" : "면적 확인 필요"}`],
     ["계약 구조", "상표 사용·운영 협력 계약(수수료) + 컨설팅 계약"],
     ["오픈 가능 시점", "계약 후 약 5개월 (설계·인테리어·상품 세팅 포함)"],
     ["내부 리스크", blockers.length ? blockers.join(", ") : "자동 상한 리스크 없음 — 현장 실사로 최종 확인"]
@@ -1774,7 +2023,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
         ? (() => {
             const u = scoreResult.franchiseUnitEcon;
             if (u) {
-              return `건물주 보유 상가(<b>${u.areaPy}평</b>) <b>Conservative</b> 기준 월 영업이익 약 <b>${formatManwon(u.monthlyOpProfit)}</b>(임대 대비 <b>${u.profitVsRentRatio != null ? u.profitVsRentRatio.toFixed(2) : "—"}배</b>). Normal 시나리오는 약 <b>25%</b> 상회(월이익 약 ${formatManwon(u.monthlyOpProfitNormal)})할 수 있습니다. `;
+              return `건물주 보유 상가(<b>${u.areaPy}평</b>) 기준 월 매출은 <b>${formatManwonRange(u.monthlySales, u.monthlySalesNormal)}</b>, 월 영업이익은 <b>${formatManwonRange(u.monthlyOpProfit, u.monthlyOpProfitNormal)}</b> 수준으로 예상되며(Conservative~Normal), 인근 임대수익 대비 <b>${formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal)}</b> 구간으로 보입니다. `;
             }
             return rentPerPy == null
               ? `인근 실거래가 제한적이어서 임대 전망은 현장 공실·시세 확인이 필요합니다. `
@@ -1791,7 +2040,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
   return (
     `[내부 검토] ${dm.note} · ${b.type} · ${total}점(${grade}). ` +
     `1km 창고형 ${c1.warehouse} · 2km ${c2.warehouse} · 5km 약국 ${c5.pharmacies}. ` +
-    `${b.floor}·${parkingLabel}·면적 ${b.areaPy || "미확인"}평. ` +
+    `${getBuildingFloorDisplay(b)}·${parkingLabel}·면적 ${b.areaPy || "미확인"}평. ` +
     (rentPerPy == null
       ? (isFranchiseStoreModel() ? `임대 시세 추정 불가 — 사업성·임대 전망 보수 적용. ` : `임대료 추정 불가 — 경제성 점수 보수 적용. `)
       : (isFranchiseStoreModel() ? `인근 시세 ${rentPerPy}만원/평 — 사업성·임대 전망 축 반영. ` : `임대 ${rentPerPy}만원/평 — ${rentOk ? "기준 이내" : "기준 초과"}. `)) +
@@ -1801,6 +2050,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
 }
 
 function render(){
+  applyBuildingManualOverrides();
   const d = DATA, b = d.building;
   const prof = TYPE_PROFILES[b.type] || TYPE_PROFILES["근린상가"];
   const today = new Date();
@@ -1815,12 +2065,17 @@ function render(){
   /* I. 개요 + 유형 분석 */
   $("bldgBadges").innerHTML =
     `<span class="badge">${b.type}</span>` +
+    (b.registryMissing && !b.bldgFloorManual && !b.leaseFloorManual ? `<span class="badge alert">건축물대장 미등록 — 출점층·건물층수·주차 입력</span>` : "") +
     (b.type === "지식산업센터" ? `<span class="badge alert">용도 제약 검토 필요</span>` : "") +
     `<span class="badge soft">${b.mainUse}</span>` +
-    `<span class="badge soft">${b.floor} · ${leasePyBadge ? `분석면적 약 ${leasePyBadge}평` : "임대 전용면적 확인 필요"}</span>` +
+    `<span class="badge soft">${getBuildingFloorDisplay(b)} · ${leasePyBadge ? `분석면적 약 ${leasePyBadge}평` : "임대 전용면적 확인 필요"}</span>` +
     (b.approvedYear ? `<span class="badge soft">사용승인 ${b.approvedYear}년</span>` : "");
   $("bldgTable").innerHTML = [
-    ["용도지역", b.landUse], ["주차", b.parking], ["도로 조건", b.roadFacing]
+    ["용도지역", b.landUse],
+    ["출점 층", b.leaseFloorLabel || "출점층 미선택 — 상단에서 선택"],
+    ["건물 규모", b.bldgFloorLabel || b.floor || "확인 필요"],
+    ["주차", b.parking],
+    ["도로 조건", b.roadFacing]
   ].map(r => `<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
   $("typeTrait").innerHTML = `<b>「${b.type}」 유형 특성</b> — ${prof.trait}`;
   const stageData = { ...b, households5km: d.demand.households5km };
@@ -1915,6 +2170,7 @@ function render(){
        : c2.hnb <= 12
          ? "뷰티·생활잡화 매장은 제품 구색(약 30% 뷰티) 관점에서 수요·경쟁을 소폭 반영합니다."
          : "H&B가 다수입니다. 뷰티 카테고리 경쟁이 커질 수 있어 구색·차별화가 필요합니다."],
+    getLeaseFloorFit(b),
     [b.parking && hasParking(b) ? "ok" : (hnbColocation ? "cond" : "no"),
      "주차 여건",
      hasParking(b)
@@ -1946,17 +2202,17 @@ function render(){
           ? (p.deals12mo >= 3 && vitalityPct >= 40 ? "ok" : (p.deals12mo >= 1 || vitalityPct >= 35 ? "cond" : "no"))
           : (rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no"))),
      franchiseMode && unitEcon
-       ? `시세 대비 수익(Conservative) — 임대 대비 ${unitEcon.profitVsRentRatio != null ? unitEcon.profitVsRentRatio.toFixed(2) : "—"}배`
+       ? `시세 대비 수익(예상) — 임대 대비 ${formatRatioRange(unitEcon.profitVsRentRatio, unitEcon.profitVsRentRatioNormal)}`
        : franchiseMode
          ? `상권·임대 전망 — 최근 거래 ${p.deals12mo}건`
          : (rentPerPy == null ? "임대료 수준 — 추정 불가" : `임대료 수준 — 평당 ${rentPerPy}만원/월`),
      franchiseMode && unitEcon
-       ? `${leasePy}평 · <b>Conservative</b> 월 영업이익 ${formatManwon(unitEcon.monthlyOpProfit)}(평당 ${unitEcon.opProfitPerPy}만원) · 임대수익 ${formatManwon(unitEcon.leasingIncome)}. Normal 가정 시 약 ${formatManwon(unitEcon.monthlyOpProfitNormal)}(임대 대비 ${unitEcon.profitVsRentRatioNormal != null ? unitEcon.profitVsRentRatioNormal.toFixed(2) : "—"}배). ${
-           unitEcon.profitVsRentRatio >= 1.15
-             ? "보수 기준으로도 직접 운영이 임대보다 유리합니다."
-             : unitEcon.profitVsRentRatio >= 0.95
-               ? "보수 기준 임대·직접운영이 비슷합니다. Normal이면 직접운영 우위 가능성이 큽니다."
-               : "보수 기준 임대가 유리할 수 있으나, Normal 가정 시 재검토 여지가 있습니다."
+       ? `${leasePy}평 · 월 매출 <b>${formatManwonRange(unitEcon.monthlySales, unitEcon.monthlySalesNormal)}</b> · 월 영업이익 <b>${formatManwonRange(unitEcon.monthlyOpProfit, unitEcon.monthlyOpProfitNormal)}</b>(${formatPerPyRange(unitEcon.opProfitPerPy, unitEcon.opProfitPerPyNormal)}) 예상. 인근 임대수익 ${formatManwon(unitEcon.leasingIncome)} 대비 ${formatRatioRange(unitEcon.profitVsRentRatio, unitEcon.profitVsRentRatioNormal)}. ${
+           (unitEcon.profitVsRentRatioNormal ?? unitEcon.profitVsRentRatio) >= 1.15
+             ? "예상 구간 상단 기준으로도 직접 운영이 임대보다 유리할 수 있습니다."
+             : (unitEcon.profitVsRentRatioNormal ?? 0) >= 1.05
+               ? "구간에 따라 임대·직접운영 손익이 비슷~직접운영 우위입니다."
+               : "구간 하단 기준 임대가 나을 수 있어 현장·운영 역량 확인이 필요합니다."
          }`
        : franchiseMode
          ? (p.deals12mo >= 3
@@ -2007,6 +2263,8 @@ function render(){
     ? "H&B는 많으나 관광·집객 POI가 약함 — 유동 둔화 구간으로 평가"
     : tm.corridorBeautyRetail
       ? "보조 상권 — 지하철·집객과 H&B가 공존하는 뷰티 리테일 권역"
+      : tm.commercialCorridor
+        ? "도심 상업축(구로·시흥대로 등) — 지하철·리테일 밀집도를 유동 프록시에 가산"
       : tm.suburbanStrip || tm.districtZone === "suburban"
       ? "교외·도로변 상권 — 인근 병원·학교·마트는 접근성이지 보행 유동이 아님"
       : tm.districtZone === "soft_corridor"
@@ -2033,22 +2291,19 @@ function render(){
     const u = unitEcon;
     const upliftPct = Math.round((u.normalUplift || 1.25) * 100 - 100);
     $("franchiseScenarioNote").innerHTML =
-      `<span class="tag">CONSERVATIVE</span>` +
-      `본 손익·사업성 점수는 <b>보수(Conservative) 시나리오</b>입니다. ` +
-      `상권·운영이 기대 수준(Normal)에 가까우면 매출·영업이익·임대 대비 수익은 표시값 대비 약 <b>${upliftPct}% 상회</b>할 수 있습니다 ` +
-      `(예: 월 영업이익 ${formatManwon(u.monthlyOpProfit)} → Normal 약 ${formatManwon(u.monthlyOpProfitNormal)}). ` +
-      `출점 검토·등급 판단은 보수 기준을 우선합니다.`;
+      `<span class="tag">예상 구간</span>` +
+      `아래 매출·영업이익은 <b>확정 수치가 아닌 예상 범위</b>입니다. ` +
+      `<b>Conservative(보수)</b>~<b>Normal(기대)</b> 사이로 표기하며, Normal은 Conservative 대비 약 <b>${upliftPct}%</b> 상회 가정입니다. ` +
+      `종합 점수·등급은 보수(Conservative) 기준으로 산정합니다.`;
     $("franchiseEconGrid").innerHTML = [
       ["분석 면적", `${u.areaPy}평`, "입력값 우선 · 미입력 시 건축물대장 추정", true],
-      ["월 추정 매출", formatManwon(u.monthlySales), `Conservative · Normal 약 ${formatManwon(u.monthlySalesNormal)}`, false],
-      ["평당 월매출", `${u.salesPerPy}만원/평`, `Normal 약 ${u.salesPerPyNormal}만원/평`, false],
-      ["월 영업이익", formatManwon(u.monthlyOpProfit), `Conservative · Normal 약 ${formatManwon(u.monthlyOpProfitNormal)}`, true],
-      ["평당 영업이익", `${u.opProfitPerPy}만원/평`, `Normal 약 ${u.opProfitPerPyNormal}만원/평`, false],
+      ["월 매출(예상)", formatManwonRange(u.monthlySales, u.monthlySalesNormal), "Conservative~Normal 구간 · 정산매출(매장+전대)", false],
+      ["평당 월매출(예상)", formatPerPyRange(u.salesPerPy, u.salesPerPyNormal), "Conservative~Normal 구간", false],
+      ["월 영업이익(예상)", formatManwonRange(u.monthlyOpProfit, u.monthlyOpProfitNormal), "임대료 0원(건물주 보유) · 관리비·인건비·로열티 반영", true],
+      ["평당 영업이익(예상)", formatPerPyRange(u.opProfitPerPy, u.opProfitPerPyNormal), "Conservative~Normal 구간", false],
       ["인근 임대 시세", `${u.marketRentPy}만원/평`, u.marketRentSource, false],
-      ["임대 대비 수익", u.profitVsRentRatio != null ? `${u.profitVsRentRatio.toFixed(2)}배` : "—",
-        u.profitVsRentRatioNormal != null
-          ? `Conservative · Normal 약 ${u.profitVsRentRatioNormal.toFixed(2)}배 (공실 시 임대 ${formatManwon(u.leasingIncome)} 대비)`
-          : `공실 시 월 ${formatManwon(u.leasingIncome)} 임대 vs 직접운영`, true]
+      ["임대 대비 수익(예상)", formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal),
+        `공실 시 임대 ${formatManwon(u.leasingIncome)} 대비 직접운영 이익 구간`, true]
     ].map(m => `<div class="metric ${m[3] ? "hl" : ""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   } else {
     if ($("franchiseScenarioNote")) $("franchiseScenarioNote").innerHTML = "";
@@ -3239,6 +3494,8 @@ async function applyAgePopulationData(params, addr) {
 function applyBuildingData(buildingResponse) {
   const item = normalizeItems(buildingResponse?.data?.response?.body?.items)[0];
 
+  DATA.building.registryMissing = !item;
+
   if (!item) return;
 
   const inferredType = inferBuildingType(item);
@@ -3255,6 +3512,11 @@ function applyBuildingData(buildingResponse) {
 
   if (grndFlrCnt) {
     DATA.building.floor = `지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
+    DATA.building.bldgFloorCnt = grndFlrCnt;
+    DATA.building.bldgFloorLabel = `건물 지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
+    const bldgInp = $("bldgFloorInput");
+    if (bldgInp && !toNumber(bldgInp.value)) bldgInp.value = String(grndFlrCnt);
+    buildLeaseFloorChips();
   }
 
   const areaM2 = toNumber(item.totArea || item.archArea);
@@ -3396,6 +3658,7 @@ function applyPlacesData({ martRes, hospitalRes, schoolRes, subwayRes, outletRes
 
   DATA.traffic.metrics.districtZone = classifyAddressZone(address || DATA.address);
   DATA.traffic.metrics.districtZoneLabel = districtZoneLabel(DATA.traffic.metrics.districtZone);
+  DATA.traffic.metrics.commercialCorridor = isUrbanCommercialCorridor(address || DATA.address);
 
   DATA.traffic.weekdayPeak = /메가 허브|관광/.test(DATA.traffic.bizType || "")
     ? "평일 오후·주말·공휴일 (관광·유동 상권)"
@@ -3713,8 +3976,13 @@ async function runPublicDataAnalysis(kakaoResult) {
   if (ageWrap?.error) errors.push(ageWrap.error);
 
   if (buildingWrap && !buildingWrap.error) applyBuildingData(buildingWrap);
-  else DATA.building.type = inferBuildingTypeFromAddress(addr);
+  else {
+    DATA.building.type = inferBuildingTypeFromAddress(addr);
+    DATA.building.registryMissing = true;
+  }
+  applyBuildingManualOverrides();
   syncAreaInputFromBuilding();
+  buildLeaseFloorChips();
   const syncedArea = toNumber($("areaInput")?.value);
   if (syncedArea > 0) DATA.building.leaseAreaPy = syncedArea;
 
@@ -3843,6 +4111,20 @@ $("areaInput")?.addEventListener("input", () => {
   const py = toNumber($("areaInput")?.value);
   if (py > 0) DATA.building.leaseAreaPy = py;
 });
+function rerenderIfAnalyzed() {
+  if (DATA.address && DATA.address !== "—" && DATA.address !== "주소를 입력하고 분석을 실행하세요") render();
+}
+["bldgFloorInput", "parkingInput"].forEach(id => {
+  $(id)?.addEventListener("change", () => {
+    if (id === "bldgFloorInput") buildLeaseFloorChips();
+    applyBuildingManualOverrides();
+    rerenderIfAnalyzed();
+  });
+  $(id)?.addEventListener("input", () => {
+    applyBuildingManualOverrides();
+  });
+});
+buildLeaseFloorChips();
 initStoreModel();
 if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
 renderRecentSearches();

@@ -57,6 +57,9 @@ window.APP_CONFIG = {
       SOFT_CORRIDOR_DEMAND_HH_WEIGHT: 0.32,
       SUBURBAN_TRAFFIC_CAP: 0.42,
       SUBURBAN_FOOT_CAP: 0.28,
+      CORRIDOR_FOOT_CAP: 0.55,
+      CORRIDOR_TRAFFIC_CAP: 0.72,
+      CORRIDOR_CLUSTER_BOOST_MAX: 0.22,
       SUBURBAN_DEMAND_HH_WEIGHT: 0.26,
       HOSPITAL_DEMAND_IDEAL_M: 500,
       HOSPITAL_DEMAND_GOOD_M: 1500,
@@ -106,7 +109,11 @@ window.APP_CONFIG = {
     ],
     SUBURBAN_KEYWORDS: [
       "미사", "하남", "파주", "김포", "일산", "산본", "동탄", "광주", "이천", "여주",
-      "양평", "의정부", "구리", "남양주", "시흥", "안산", "수원", "용인", "오산", "평택"
+      "양평", "의정부", "구리", "남양주", "시흥시", "안산", "수원", "용인", "오산", "평택"
+    ],
+    COMMERCIAL_CORRIDOR_KEYWORDS: [
+      "시흥대로", "구로", "가산", "디지털단지", "관악", "금천", "독산", "문래", "영등포",
+      "신도림", "여의도", "목동", "하남", "미사", "강변", "테크노", "역세권"
     ],
     PREMIUM_DISTRICT_KEYWORDS: [
       "성수", "강남", "홍대", "이태원", "압구정", "청담",
