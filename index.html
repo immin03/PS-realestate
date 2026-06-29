@@ -10,14 +10,17 @@
     --ink:#111111; --paper:#FFFFFF; --red:#C8102E; --peach:#FBE9DD;
     --gray:#7A7A7A; --hairline:#DADAD5; --teal:#1D9E75; --amber:#B97515;
     --wash:#F4F3EF; --ok:#0F6E56; --warn:#A32D2D;
+    --page-max:900px; --page-pad:16px;
   }
   *{ box-sizing:border-box; margin:0; padding:0; }
   body{ font-family:"Pretendard",-apple-system,sans-serif; background:var(--wash); color:var(--ink);
         font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased; }
 
   /* ===== Toolbar (screen only) ===== */
+  .page-chrome{
+    max-width:var(--page-max); margin:0 auto; padding:20px var(--page-pad) 0;
+  }
   .toolbar{
-    max-width:1100px; margin:0 auto; padding:20px 16px 0;
     display:flex; flex-direction:column; gap:10px; align-items:stretch;
   }
   .toolbar-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
@@ -75,7 +78,7 @@
     .area-field{ flex:0 0 96px; }
   }
   .lease-floor-bar{
-    max-width:1100px; margin:10px auto 0; padding:0 16px;
+    max-width:var(--page-max); margin:10px auto 0; padding:0 var(--page-pad);
     display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
   }
   .lease-floor-label{
@@ -104,7 +107,7 @@
   .store-model button.on{ background:var(--teal); color:#fff; }
   body:not(.store-franchise) .sec-lead-franchise, body:not(.store-franchise) .franchise-tone{ display:none !important; }
   body.store-franchise .sec-lead-direct, body.store-franchise .direct-tone{ display:none !important; }
-  .demo-note{ max-width:1100px; margin:8px auto 0; padding:0 16px; font-size:12px; color:var(--gray); }
+  .demo-note{ max-width:var(--page-max); margin:8px auto 0; padding:0 var(--page-pad); font-size:12px; color:var(--gray); }
   .demo-note b{ color:var(--red); font-weight:600; }
   .scenario-note{
     margin-bottom:14px; padding:12px 16px; border-radius:8px;
@@ -117,7 +120,7 @@
   }
 
   /* ===== Report sheet ===== */
-  .sheet{ max-width:900px; margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
+  .sheet{ max-width:var(--page-max); margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
           padding:56px 64px 48px; }
   @media (max-width:720px){ .sheet{ padding:32px 20px; } }
 
@@ -138,7 +141,7 @@
   .gate-btn{ width:100%; margin-top:14px; height:48px; font-size:15px; }
   #gateErr{ font-size:12px; color:var(--red); margin-top:12px; min-height:18px; line-height:1.5; visibility:hidden; }
   #gateErr.show{ visibility:visible; }
-  .recent-searches{ max-width:1100px; margin:6px auto 0; padding:0 16px; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
+  .recent-searches{ max-width:var(--page-max); margin:6px auto 0; padding:0 var(--page-pad); display:none; gap:6px; flex-wrap:wrap; align-items:center; }
   .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; }
   .recent-searches button{ border:1px solid var(--hairline); background:var(--paper); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .recent-searches button:hover{ border-color:var(--ink); color:var(--ink); }
@@ -250,7 +253,7 @@
       margin:14mm 12mm 22mm 12mm;
     }
     body{ background:#fff; }
-    #gate,.toolbar,.lease-floor-bar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
+    #gate,.page-chrome,.lease-floor-bar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
     .sheet{ border:none; margin:0; max-width:none; padding:24px 8px 32px; }
     section{ margin-top:28px; }
     #map{ height:300px; }
@@ -387,6 +390,7 @@ const TYPE_PROFILES = {
 })();
 </script>
 
+<div class="page-chrome">
 <div class="toolbar">
   <div class="toolbar-row toolbar-row-address">
     <div class="addr-field-wrap">
@@ -406,7 +410,7 @@ const TYPE_PROFILES = {
       <span class="area-suffix">층</span>
     </label>
     <label class="area-field" title="주차 대수 — 건축물대장 미등록 시 입력">
-      <input type="number" id="parkingInput" min="0" max="999" step="1" placeholder="주차" inputmode="numeric" aria-label="주차 대수">
+      <input type="number" id="parkingInput" min="0" max="9999" step="1" placeholder="자동" inputmode="numeric" aria-label="주차 대수">
     </label>
     </div>
   <div class="store-model" title="출점 검토 기준을 선택합니다">
@@ -418,6 +422,7 @@ const TYPE_PROFILES = {
     <button id="modeExternal">가맹점주 제공용</button>
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
+  </div>
   </div>
 </div>
 <div class="lease-floor-bar" id="leaseFloorBar">
@@ -764,9 +769,13 @@ function warehouseThreat(warehouseStores) {
 
 function hasParking(b) {
   const manual = toNumber($("parkingInput")?.value);
-  if (manual >= 1) return true;
+  const touched = $("parkingInput")?.dataset.userTouched === "1";
+  if (touched && manual >= 1) return true;
+  if (toNumber(b?.parkingRegistry) >= 1) return true;
   const p = String(b?.parking || "");
-  if (!p || p.includes("없음") || p.includes("미확보") || p.includes("확인 필요")) return false;
+  if (!p) return false;
+  if (/주차\s*\d+/.test(p)) return true;
+  if (p.includes("없음") || p.includes("미확보") || p.includes("확인 필요") || p.includes("미조회")) return false;
   return true;
 }
 
@@ -840,31 +849,78 @@ function syncParkingInputFromRegistry(total) {
   pin.dataset.autoFilled = "1";
 }
 
-function resetManualFieldTouchFlags() {
+function normalizeAddrKey(addr) {
+  return String(addr || "")
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/^(경기도?|서울특별시|서울|부산광역시|부산|대구광역시|대구|인천광역시|인천|광주광역시|광주|대전광역시|대전|울산광역시|울산|세종특별자치시|세종)/, "")
+    .replace(/(특별시|광역시|특별자치시|특별자치도)/g, "")
+    .toLowerCase();
+}
+
+function clearManualInputsForNewAddress() {
   const pin = $("parkingInput");
   const bldg = $("bldgFloorInput");
-  if (pin) delete pin.dataset.userTouched;
-  if (bldg) delete bldg.dataset.userTouched;
+  if (pin) {
+    pin.value = "";
+    pin.placeholder = "자동";
+    delete pin.dataset.userTouched;
+    delete pin.dataset.autoFilled;
+  }
+  if (bldg) {
+    bldg.value = "";
+    delete bldg.dataset.userTouched;
+  }
+  document.querySelectorAll("#leaseFloorChips .floor-chip.on").forEach(btn => {
+    btn.classList.remove("on");
+    btn.setAttribute("aria-pressed", "false");
+  });
+  DATA.building.parkingRegistry = 0;
+  DATA.building.parkingRegistryLabel = "";
+  DATA.building.parkingManual = false;
+  DATA.building.bldgFloorLabel = "";
+  DATA.building.bldgFloorCnt = 0;
+  DATA.building.bldgFloorManual = false;
+  DATA.building.leaseFloors = [];
+  DATA.building.leaseFloorLabel = "";
+  DATA.building.leaseFloorManual = false;
+  resolveParkingDisplay();
+}
+
+let lastAddrContext = "";
+let lastAnalyzedAddrKey = "";
+
+function onAddressContextChange(newAddr) {
+  const next = String(newAddr || "").trim();
+  if (!next) return;
+
+  const nextKey = normalizeAddrKey(next);
+  const analyzedKey = normalizeAddrKey(lastAnalyzedAddrKey);
+  const hasPriorAnalysis = analyzedKey
+    && DATA.address
+    && DATA.address !== "주소를 입력하고 분석을 실행하세요"
+    && DATA.address !== "—";
+
+  if (hasPriorAnalysis && nextKey !== analyzedKey) {
+    clearManualInputsForNewAddress();
+    rerenderIfAnalyzed();
+  }
+  lastAddrContext = next;
+}
+
+function resetManualFieldTouchFlags() {
+  clearManualInputsForNewAddress();
 }
 
 function applyBuildingManualOverrides() {
-  const parkingCnt = toNumber($("parkingInput")?.value);
-  const registryPark = toNumber(DATA.building.parkingRegistry);
-  const parkingTouched = $("parkingInput")?.dataset.userTouched === "1";
-
-  if (registryPark > 0 && !parkingTouched) {
-    DATA.building.parking = DATA.building.parkingRegistryLabel || `주차 ${registryPark}대 (건축물대장 기준)`;
-    DATA.building.parkingManual = false;
-  } else if (parkingCnt >= 1) {
-    DATA.building.parking = `주차 ${parkingCnt}대 (현장·입력값)`;
-    DATA.building.parkingManual = true;
-  }
   const bldgCnt = toNumber($("bldgFloorInput")?.value);
   const bldgTouched = $("bldgFloorInput")?.dataset.userTouched === "1";
   if (bldgCnt >= 2 && bldgTouched) {
     DATA.building.bldgFloorCnt = bldgCnt;
     DATA.building.bldgFloorLabel = `건물 지상 ${bldgCnt}층${bldgCnt >= 10 ? " · 신축 고층" : ""}`;
     DATA.building.bldgFloorManual = true;
+  } else if (!bldgTouched && DATA.building.bldgFloorLabel) {
+    /* 대장·자동값 유지 */
   } else if (!DATA.building.bldgFloorLabel && DATA.building.floor) {
     const m = String(DATA.building.floor).match(/지상\s*(\d+)\s*층/);
     if (m) DATA.building.bldgFloorLabel = `건물 지상 ${m[1]}층`;
@@ -880,6 +936,8 @@ function applyBuildingManualOverrides() {
     DATA.building.leaseFloorLabel = "";
     DATA.building.leaseFloorManual = false;
   }
+
+  resolveParkingDisplay();
 }
 
 function isCommercialLandUse(landUse) {
@@ -1985,6 +2043,7 @@ function renderRecentSearches() {
     list.map(a => `<button type="button" title="${escapeHtml(a)}">${escapeHtml(a)}</button>`).join("");
   box.querySelectorAll("button").forEach((btn, i) => {
     btn.addEventListener("click", () => {
+      onAddressContextChange(list[i]);
       $("addrInput").value = list[i];
       $("runBtn").click();
     });
@@ -2746,7 +2805,10 @@ function selectAddrSuggestion(index) {
   const item = addrSuggestState.items[index];
   if (!item) return;
   const input = $("addrInput");
-  if (input) input.value = item.main;
+  if (input) {
+    onAddressContextChange(item.main);
+    input.value = item.main;
+  }
   hideAddrSuggest();
   input?.focus();
 }
@@ -2816,7 +2878,11 @@ function initAddrAutocomplete() {
   const input = $("addrInput");
   if (!input) return;
 
-  input.addEventListener("input", () => queueAddrSuggest(input.value));
+  input.addEventListener("input", () => {
+    queueAddrSuggest(input.value);
+    onAddressContextChange(input.value.trim());
+  });
+  input.addEventListener("change", () => onAddressContextChange(input.value.trim()));
   input.addEventListener("focus", () => {
     if (input.value.trim().length >= 2 && !addrSuggestState.items.length) {
       queueAddrSuggest(input.value);
@@ -3061,8 +3127,107 @@ async function callBuildingApi(params) {
     bjdongCd: params.bjdongCd,
     bun: params.bun,
     ji: params.ji,
-    platGbCd: "0"
+    platGbCd: params.platGbCd || "0"
   }, "건축물대장");
+}
+
+function buildParamsFromJusoItem(base, jusoItem) {
+  const p = { ...base };
+  if (!jusoItem) return p;
+  if (jusoItem.admCd) {
+    p.sigunguCd = jusoItem.admCd.slice(0, 5);
+    p.bjdongCd = jusoItem.admCd.slice(5, 10);
+    p.lawdCd = jusoItem.admCd.slice(0, 5);
+    p.bCode = jusoItem.admCd;
+  }
+  if (jusoItem.jibunAddr) {
+    const jibun = parseJibunFromAddress(jusoItem.jibunAddr);
+    if (jibun.bun !== "0000") {
+      p.bun = jibun.bun;
+      p.ji = jibun.ji;
+    }
+  }
+  if (jusoItem.roadAddr) p.fullAddress = jusoItem.roadAddr;
+  return p;
+}
+
+function buildingRegistryHasItems(wrap) {
+  return normalizeItems(wrap?.data?.response?.body?.items).length > 0;
+}
+
+async function resolveBuildingRegistry(params, jusoWrap) {
+  const tries = [];
+  const seen = new Set();
+  const pushTry = (p) => {
+    const key = `${p.sigunguCd}-${p.bjdongCd}-${p.bun}-${p.ji}-${p.platGbCd || "0"}`;
+    if (!p.sigunguCd || !p.bjdongCd || seen.has(key)) return;
+    seen.add(key);
+    tries.push({ ...p, platGbCd: p.platGbCd || "0" });
+  };
+
+  pushTry(params);
+  if (jusoWrap?.first) pushTry(buildParamsFromJusoItem(params, jusoWrap.first));
+  for (const item of (jusoWrap?.items || []).slice(0, 5)) {
+    pushTry(buildParamsFromJusoItem(params, item));
+  }
+
+  let lastWrap = null;
+  let lastParams = params;
+  for (const p of tries) {
+    if (!p.sigunguCd || !p.bjdongCd) continue;
+    const wrap = await callBuildingApi(p);
+    lastWrap = wrap;
+    lastParams = p;
+    if (buildingRegistryHasItems(wrap)) return { wrap, params: p };
+  }
+
+  for (const platGbCd of ["1", "2"]) {
+    const p = { ...params, platGbCd };
+    if (!p.sigunguCd || !p.bjdongCd) continue;
+    const key = `${p.sigunguCd}-${p.bjdongCd}-${p.bun}-${p.ji}-${platGbCd}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const wrap = await callBuildingApi(p);
+    lastWrap = wrap;
+    lastParams = p;
+    if (buildingRegistryHasItems(wrap)) return { wrap, params: p };
+  }
+
+  return { wrap: lastWrap, params: lastParams };
+}
+
+function resetBuildingSnapshotForAnalysis() {
+  DATA.building.parkingRegistry = 0;
+  DATA.building.parkingRegistryLabel = "";
+  DATA.building.parkingManual = false;
+  DATA.building.registryMissing = false;
+  DATA.building.parking = "";
+  DATA.building.bldgFloorLabel = "";
+  DATA.building.bldgFloorCnt = 0;
+  DATA.building.floor = "[분석 후 표시]";
+  DATA.building.mainUse = "[분석 후 표시]";
+  DATA.building.areaPy = DATA.building.areaPy || 0;
+}
+
+function resolveParkingDisplay() {
+  const pin = $("parkingInput");
+  const touched = pin?.dataset.userTouched === "1";
+  const manual = toNumber(pin?.value);
+  const registry = toNumber(DATA.building.parkingRegistry);
+
+  if (touched && manual >= 1) {
+    DATA.building.parking = `주차 ${manual}대 (입력값)`;
+    DATA.building.parkingManual = true;
+    return;
+  }
+  if (registry > 0) {
+    DATA.building.parking = DATA.building.parkingRegistryLabel || `주차 ${registry}대 (건축물대장)`;
+    DATA.building.parkingManual = false;
+    if (pin && !touched) pin.value = String(registry);
+    return;
+  }
+  DATA.building.parking = "주차 대수 — 건축물대장 미조회(신축·미등록 가능)";
+  DATA.building.parkingManual = false;
 }
 
 async function callTradeApi(params) {
@@ -4154,7 +4319,11 @@ async function safeApi(label, fn) {
 async function runPublicDataAnalysis(kakaoResult) {
   const addr = $("addrInput").value.trim();
   const errors = [];
-  resetManualFieldTouchFlags();
+  const addrKey = normalizeAddrKey(addr);
+  const analyzedKey = normalizeAddrKey(lastAnalyzedAddrKey);
+  if (addrKey && analyzedKey && addrKey !== analyzedKey) {
+    clearManualInputsForNewAddress();
+  }
   let params = getAddressParamsFromKakao(kakaoResult);
 
   DATA.address = params.fullAddress || addr;
@@ -4171,20 +4340,26 @@ async function runPublicDataAnalysis(kakaoResult) {
 
   await loadWarehouseBrands();
   setStepProgress("base", 10);
+  resetBuildingSnapshotForAnalysis();
 
-  const [jusoWrap, tradeWrap, buildingWrap, landuseWrap, landCharWrap] = await Promise.all([
+  const [jusoWrap, tradeWrap, landuseWrap, landCharWrap] = await Promise.all([
     safeApi("주소 검색", () => callJusoApi(addr)),
     safeApi("상업용 실거래", () => callTradeApi(params)),
-    safeApi("건축물대장", () => callBuildingApi(params)),
     safeApi("토지이용계획", () => callLanduseApi(params)),
     safeApi("토지특성", () => callLandCharacteristicsApi(params)),
   ]);
+
+  params = applyJusoParams(params, jusoWrap?.error ? null : jusoWrap);
+
+  const buildingResolved = await safeApi("건축물대장", () => resolveBuildingRegistry(params, jusoWrap?.error ? null : jusoWrap));
+  const buildingWrap = buildingResolved?.wrap;
+  if (buildingResolved?.params) params = { ...params, ...buildingResolved.params };
+
   setStepProgress("base", 100);
 
   if (jusoWrap?.error) errors.push(jusoWrap.error);
-  if (buildingWrap?.error) errors.push(buildingWrap.error);
-
-  params = applyJusoParams(params, jusoWrap?.error ? null : jusoWrap);
+  if (buildingResolved?.error) errors.push(buildingResolved.error);
+  else if (buildingWrap?.error) errors.push(buildingWrap.error);
 
   let populationWrap = null;
   if (params.roadNmCd) {
@@ -4237,8 +4412,9 @@ async function runPublicDataAnalysis(kakaoResult) {
   if (competitionWrap?.error) errors.push(competitionWrap.error);
   if (ageWrap?.error) errors.push(ageWrap.error);
 
-  if (buildingWrap && !buildingWrap.error) applyBuildingData(buildingWrap);
-  else {
+  if (buildingWrap && !buildingWrap.error && buildingRegistryHasItems(buildingWrap)) {
+    applyBuildingData(buildingWrap);
+  } else {
     DATA.building.type = inferBuildingTypeFromAddress(addr);
     DATA.building.registryMissing = true;
   }
@@ -4282,7 +4458,7 @@ async function runPublicDataAnalysis(kakaoResult) {
     martRes: placeResults.mart
   });
 
-  if (placeInferred && (buildingWrap?.error || !normalizeItems(buildingWrap?.data?.response?.body?.items).length)) {
+  if (placeInferred && (!buildingWrap || buildingWrap.error || !buildingRegistryHasItems(buildingWrap))) {
     DATA.building.type = placeInferred;
   }
 
@@ -4291,7 +4467,7 @@ async function runPublicDataAnalysis(kakaoResult) {
 
   DATA.quality = {
     geocode: !!(params.lat && params.lng),
-    building: !!(buildingWrap && !buildingWrap.error),
+    building: !!(buildingWrap && !buildingWrap.error && buildingRegistryHasItems(buildingWrap)),
     trade: !!(tradeWrap && !tradeWrap.error && tradeWrap.ok !== false && DATA.price.deals12mo > 0),
     population: !!(populationWrap && !populationWrap.error),
     places: Object.keys(placeResults).length >= 5,
@@ -4302,6 +4478,7 @@ async function runPublicDataAnalysis(kakaoResult) {
   setStepProgress("finish", 50);
   render();
   setStepProgress("finish", 100);
+  lastAnalyzedAddrKey = DATA.address;
   saveRecentSearch(addr);
 
   if (errors.length) {
@@ -4317,6 +4494,7 @@ $("runBtn").addEventListener("click", async ()=>{
     return;
   }
 
+  onAddressContextChange(addr);
   resetAnalysisProgress();
   setStepProgress("sdk", 0);
   $("runBtn").disabled = true;
@@ -4384,7 +4562,13 @@ function rerenderIfAnalyzed() {
   });
   $(id)?.addEventListener("input", () => {
     const el = $(id);
-    if (el) el.dataset.userTouched = "1";
+    if (!el) return;
+    if (id === "parkingInput") {
+      if (toNumber(el.value) >= 1) el.dataset.userTouched = "1";
+      else delete el.dataset.userTouched;
+    } else {
+      el.dataset.userTouched = "1";
+    }
     applyBuildingManualOverrides();
   });
 });
