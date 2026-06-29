@@ -359,7 +359,7 @@ const TYPE_PROFILES = {
         <div class="score-note" id="blockerNote" style="display:none; color:var(--warn);"></div>
         <div class="score-note">등급: S 90+ · A 80+ · B 68+ · C 50+ · D 50 미만 · 거리·유형·리스크 가중 v2 모델</div>
         <div class="score-note">
-  ※ 물리 조건은 1층 여부 및 접근성, 매장 면적 확보 가능성, 주차 여건, 건물 유형 및 용도 제약 여부를 기준으로 평가합니다.
+  ※ 물리 조건은 1층 여부 및 접근성, 매장 면적, 주차(교외·차량 중심 입지 가중), 건물 유형 및 용도 제약 여부를 기준으로 평가합니다. H&B 동선 상권은 보행·집객을 우선합니다.
       </div>
     </div>
   </section>
@@ -633,6 +633,29 @@ function applyFootTrafficScoreCap(composite, foot, cfg) {
   return capped;
 }
 
+function detectHNBColocationStrategy(metrics) {
+  const zone = metrics?.districtZone || "general";
+  if (zone === "suburban" || metrics?.suburbanStrip) return false;
+  const hnb2 = metrics?.hnb2km || 0;
+  return detectCorridorBeautyRetail(metrics) || hnb2 >= 3;
+}
+
+function scoreHospitalDemandBoost(metrics, cfg) {
+  const trafficCfg = cfg || CONFIG.SCORING?.TRAFFIC || {};
+  const dist = metrics?.hospitalDistM;
+  const count = metrics?.hospitalCount || 0;
+  if (dist == null && !count) return 0;
+  let boost = distanceScore(
+    dist,
+    trafficCfg.HOSPITAL_DEMAND_IDEAL_M || 500,
+    trafficCfg.HOSPITAL_DEMAND_GOOD_M || 1500,
+    4000
+  ) * (trafficCfg.HOSPITAL_DEMAND_WEIGHT || 0.12);
+  if (dist != null && Number(dist) <= 700) boost += 0.045;
+  if (count >= 8) boost += 0.02;
+  return boost;
+}
+
 function detectCorridorBeautyRetail(metrics) {
   const zone = metrics?.districtZone || "general";
   if (zone !== "soft_corridor") return false;
@@ -675,6 +698,9 @@ function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
     if (deptCount > 0) s += 0.07;
     if (landmarkCount >= 2) s += 0.06;
     if (landmarkCount >= 4) s += 0.03;
+    const hospitalDist = metrics?.hospitalDistM;
+    if (hospitalDist != null && Number(hospitalDist) <= 600) s += 0.06;
+    else if (hospitalDist != null && Number(hospitalDist) <= 1200) s += 0.035;
     const beautyRetail = detectCorridorBeautyRetail({ ...metrics, districtZone: zone });
     if (detectCorridorStagnation({ ...metrics, districtZone: zone })) s *= 0.68;
     else if (hnb2 >= 5 && tourismPoi < 3) s *= beautyRetail ? 0.9 : 0.8;
@@ -796,6 +822,9 @@ function computeMarketVitality({ address, metrics, traffic, competition, demand 
   if (dept > 0) v += 0.07;
   if (zone !== "soft_corridor" && subwayNear) v += 0.09;
   if (landmarks >= 3) v += 0.05;
+  const hospitalDist = m.hospitalDistM;
+  if (hospitalDist != null && Number(hospitalDist) <= 800) v += 0.04;
+  else if (hospitalDist != null && Number(hospitalDist) <= 1800) v += 0.02;
 
   if (zone === "mega_hub" && foot >= 0.32) v += 0.12;
   else if (zone === "premium" && foot >= 0.38) v += 0.06;
@@ -910,6 +939,13 @@ function scoreCompetitionV2(competition, max, marketContext) {
     s = Math.max(s, floor);
   }
 
+  const hospDist = marketContext?.metrics?.hospitalDistM;
+  if (hospDist != null && Number(hospDist) <= 900) {
+    s += compCfg.HOSPITAL_COMP_BONUS_NEAR || 0.05;
+  } else if (hospDist != null && Number(hospDist) <= 2000) {
+    s += compCfg.HOSPITAL_COMP_BONUS_MID || 0.025;
+  }
+
   return Math.round(clamp01(s) * max);
 }
 
@@ -939,6 +975,7 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
     const hubBlend = Math.max(foot, vitality * 0.85);
     composite = clamp01(
       hh * 0.2 + age * 0.16 + apt * 0.08 + hubBlend * footBlend + beautyDemand + subwayBoost + 0.12
+      + scoreHospitalDemandBoost(trafficMetrics)
     );
   } else if (zone === "soft_corridor") {
     const stagnant = trafficMetrics?.corridorStagnant;
@@ -951,13 +988,23 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
       hh * hhWeight + age * 0.22 + apt * 0.14 + localFoot * footWeight
       + beautyDemand * (beautyRetail ? 1 : stagnant ? 0.7 : 0.85)
       + subwayBoost * (beautyRetail ? 0.5 : 0.4) + 0.08
+      + scoreHospitalDemandBoost(trafficMetrics)
     );
+    if (beautyRetail || hnb2 >= 4) composite = clamp01(composite + 0.04);
   } else if (zone === "suburban" || trafficMetrics?.suburbanStrip) {
+    const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
+    const hhW = trafficCfg.SUBURBAN_DEMAND_HH_WEIGHT || 0.26;
     composite = clamp01(
-      hh * 0.38 + age * 0.26 + apt * 0.2 + foot * (footBlend * 0.25) + beautyDemand * 0.6 + subwayBoost * 0.2 + 0.06
+      hh * hhW + age * 0.2 + apt * 0.12 + foot * (footBlend * 0.18)
+      + beautyDemand * 0.45 + subwayBoost * 0.12 + 0.04
+      + scoreHospitalDemandBoost(trafficMetrics) * 0.7
     );
+    if (foot < 0.26 && hnb2 < 3) composite = clamp01(composite * 0.86);
   } else {
-    composite = clamp01(hh * 0.4 + age * 0.27 + apt * 0.21 + beautyDemand + subwayBoost + 0.08);
+    composite = clamp01(
+      hh * 0.4 + age * 0.27 + apt * 0.21 + beautyDemand + subwayBoost + 0.08
+      + scoreHospitalDemandBoost(trafficMetrics)
+    );
   }
 
   return Math.round(composite * typeFactor * max);
@@ -974,25 +1021,37 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
 
   const subway = distanceScore(m.subwayDistM, cfg.SUBWAY_IDEAL_M || 400, cfg.SUBWAY_GOOD_M || 1200, 3000);
   const mart = distanceScore(m.martDistM, cfg.MART_IDEAL_M || 800, cfg.MART_GOOD_M || 2500, 5000);
-  const hospital = distanceScore(m.hospitalDistM, 600, 2000, 5000);
+  const hospital = distanceScore(
+    m.hospitalDistM,
+    cfg.HOSPITAL_DEMAND_IDEAL_M || 500,
+    cfg.HOSPITAL_DEMAND_GOOD_M || 1500,
+    4000
+  );
   const school = distanceScore(m.schoolDistM, 500, 1800, 4500);
+  const hospitalW = suburban
+    ? (cfg.HOSPITAL_TRAFFIC_WEIGHT_SUBURBAN || 0.02)
+    : (cfg.HOSPITAL_TRAFFIC_WEIGHT_URBAN || 0.11);
 
   const accessScale = zone === "mega_hub" || zone === "premium" ? 1
-    : zone === "soft_corridor" ? (detectCorridorBeautyRetail(m) ? 0.62 : 0.55)
-    : suburban ? 0.35
+    : zone === "soft_corridor" ? (detectCorridorBeautyRetail(m) ? 0.68 : 0.58)
+    : suburban ? 0.32
     : foot < 0.35 ? 0.45
     : 0.65;
 
   const access = clamp01(
-    subway * 0.1 + mart * 0.07 + hospital * 0.04 + school * 0.03
+    subway * 0.1 + mart * 0.07 + hospital * hospitalW + school * 0.02
   ) * accessScale;
 
   const footCore = foot * 0.48 + vitality * 0.2;
   const landmarkScore = Math.min(0.06, (landmarks?.length || 0) * 0.015);
-  let bizBonus = /관광|메가 허브/.test(traffic.bizType || "") ? 0.05 : 0;
-  if (suburban || stagnant) bizBonus = 0;
+  let bizBonus = /관광|메가 허브|리테일/.test(traffic.bizType || "") ? 0.05 : 0;
+  if (suburban) bizBonus = Math.min(bizBonus, 0.02);
+  if (stagnant) bizBonus = 0;
 
-  let composite = clamp01(footCore + access + landmarkScore + bizBonus + 0.03);
+  let hospitalSynergy = 0;
+  if (!suburban && hospital >= 0.55) hospitalSynergy = hospital * 0.08;
+
+  let composite = clamp01(footCore + access + landmarkScore + bizBonus + hospitalSynergy + 0.03);
   composite = applyFootTrafficScoreCap(composite, foot, cfg);
 
   if (zone === "soft_corridor") {
@@ -1006,7 +1065,7 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   return Math.round(composite * max);
 }
 
-function scoreEconomicsV2(price, max, buildingType) {
+function scoreEconomicsV2(price, max, buildingType, trafficMetrics) {
   const rent = price.rentPerPy;
   const sale = price.salePerPy;
   const deals = price.deals12mo || 0;
@@ -1036,15 +1095,25 @@ function scoreEconomicsV2(price, max, buildingType) {
   if (deals >= 3) s = Math.min(1, s + 0.06);
   else if (deals === 0) s *= 0.88;
 
-  return Math.round(s * max);
+  let result = Math.round(s * max);
+  const zone = trafficMetrics?.districtZone || "general";
+  const foot = trafficMetrics?.footTrafficProxy || 0;
+  const hnb2 = trafficMetrics?.hnb2km || 0;
+  if ((zone === "suburban" || trafficMetrics?.suburbanStrip) && foot < 0.28 && hnb2 < 4) {
+    result = Math.round(result * 0.84);
+  }
+  return result;
 }
 
-function scorePhysicalV2(building, max) {
+function scorePhysicalV2(building, max, trafficMetrics) {
   const cfg = CONFIG.SCORING?.PHYSICAL || {};
   const ideal = cfg.AREA_IDEAL_PY || 200;
   const minPy = cfg.AREA_MIN_PY || 150;
   const floorPy = cfg.AREA_FLOOR_PY || 120;
   const type = building.type || "근린상가";
+
+  const physCfg = cfg;
+  const hnbCorridor = detectHNBColocationStrategy(trafficMetrics || {});
 
   let s = 0.08;
 
@@ -1057,8 +1126,15 @@ function scorePhysicalV2(building, max) {
   else if (area >= floorPy) s += 0.08;
   else if (area > 0) s += 0.02;
 
-  if (hasParking(building)) s += 0.22;
-  else s -= 0.05;
+  if (hasParking(building)) {
+    s += hnbCorridor
+      ? (physCfg.PARKING_BONUS_HNB_CORRIDOR || 0.08)
+      : (physCfg.PARKING_BONUS_DEFAULT || 0.15);
+  } else {
+    s -= hnbCorridor
+      ? (physCfg.PARKING_PENALTY_HNB_CORRIDOR || 0.02)
+      : (physCfg.PARKING_PENALTY_DEFAULT || 0.05);
+  }
 
   if (type === "근린상가" || type === "복합상가") s += 0.12;
   else if (type === "아파트 단지내 상가") s += 0.06;
@@ -1115,7 +1191,9 @@ function collectScoreBlockers(data) {
   if ((c1.warehouse || 0) > 0 || warehouseThreat(c1.warehouseStores) >= 0.75) {
     blockers.push("warehouse_1km");
   }
-  if (!hasParking(b)) blockers.push("no_parking");
+  const metrics = data.traffic?.metrics || {};
+  metrics.hnb2km = metrics.hnb2km || data.competition?.["2km"]?.hnb || 0;
+  if (!hasParking(b) && !detectHNBColocationStrategy(metrics)) blockers.push("no_parking");
   if (rent != null && rent > benchmark * 2) blockers.push("rent_high");
   if (toNumber(b.areaPy) > 0 && toNumber(b.areaPy) < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
     blockers.push("area_small");
@@ -1190,8 +1268,8 @@ function computeFullScore(data) {
     demand: scoreDemandV2(data.demand, W.demand, prof.factor, data.traffic?.metrics),
     traffic: scoreTrafficV2(data.traffic, data.landmarks, W.traffic, data.traffic?.metrics),
     competition: scoreCompetitionV2(data.competition, W.competition, marketContext),
-    economics: scoreEconomicsV2(data.price, W.economics, b.type),
-    physical: scorePhysicalV2(b, W.physical)
+    economics: scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics),
+    physical: scorePhysicalV2(b, W.physical, data.traffic?.metrics)
   };
 
   let total = Object.values(sc).reduce((a, v) => a + v, 0);
@@ -1205,6 +1283,14 @@ function computeFullScore(data) {
     if (trafficOk && demandOk) {
       total += Math.round(vitality * synergyMax);
     }
+  }
+
+  if (detectHNBColocationStrategy(data.traffic?.metrics)) {
+    const hnb2 = data.traffic?.metrics?.hnb2km || 0;
+    const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
+    const stratMax = trafficCfg.HNB_COLOCATION_SYNERGY_MAX || 7;
+    const beautyExtra = data.traffic?.metrics?.corridorBeautyRetail ? 2 : 0;
+    total += Math.min(stratMax, Math.round((hnb2 / 16) * stratMax) + beautyExtra);
   }
 
   const blockers = collectScoreBlockers(data);
@@ -1382,6 +1468,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
   const { total, grade } = scoreResult;
   const parkingLabel = String(b.parking || "확인 필요").split("(")[0].trim();
   const warnTexts = warns.map(f => f[1].split(" — ")[0]).join(", ");
+  const hnbColocation = detectHNBColocationStrategy({ ...(d.traffic?.metrics || {}), hnb2km: c2.hnb });
 
   const footProxy = d.traffic?.metrics?.footTrafficProxy || 0;
   const hubNote = scoreResult.isPremiumHub
@@ -1400,7 +1487,7 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
       `본 리포트는 행정안전부·국토교통부 등 공공데이터와 카카오 장소정보, 본사 직영점 운영 기준을 바탕으로 작성되었습니다. ` +
       hubNote +
       `배후 주거는 약 <b>${fmt(dm.households5km)}세대</b>이며, 반경 5km 내 약국 <b>${c5.pharmacies}</b>개소, 창고형 약국 <b>${c5.warehouse}</b>개소가 확인되었습니다. ` +
-      `${hasParking(b) ? `주차 여건(<b>${parkingLabel}</b>)은 창고형 모델 운영에 유리한 조건입니다. ` : ""}` +
+      `${hasParking(b) ? `주차 여건(<b>${parkingLabel}</b>)이 확보되어 있습니다. ` : hnbColocation ? `본 입지는 <b>H&B 동선 상권</b>으로 보행·집객을 우선 반영했습니다. ` : ""}` +
       (rentPerPy == null
         ? `인근 실거래가 기준 임대료 추정이 어려워, 경제성은 현장 임대 조건 확인이 필요합니다. `
         : `평당 임대료는 약 <b>${rentPerPy}만원</b>으로 추정되며, 본사 표준 손익 모델 대비 ${rentOk ? "적정 수준" : "다소 높은 편"}으로 분석됩니다. `) +
@@ -1500,6 +1587,7 @@ function render(){
   const phOversat = scoreResult.pharmacyOversaturated || detectPharmacyOversaturation(d.competition);
   const districtZone = scoreResult.districtZone || d.traffic?.metrics?.districtZone || "general";
   const vitalityPct = scoreResult.marketVitality != null ? Math.round(scoreResult.marketVitality * 100) : null;
+  const hnbColocation = detectHNBColocationStrategy({ ...(d.traffic?.metrics || {}), hnb2km: c2.hnb });
   const fits = [
     [c2.warehouse === 0 ? "ok" : (c1.warehouse === 0 ? "cond" : "no"),
      "창고형 약국·유사 업태",
@@ -1526,11 +1614,13 @@ function render(){
        : c2.hnb <= 12
          ? "뷰티·생활잡화 매장은 제품 구색(약 30% 뷰티) 관점에서 수요·경쟁을 소폭 반영합니다."
          : "H&B가 다수입니다. 뷰티 카테고리 경쟁이 커질 수 있어 구색·차별화가 필요합니다."],
-    [b.parking && hasParking(b) ? "ok" : "no",
+    [b.parking && hasParking(b) ? "ok" : (hnbColocation ? "cond" : "no"),
      "주차 여건",
      hasParking(b)
-       ? `${b.parking}. 창고형 모델은 차량 방문 비중이 높아 주차는 필수 요건이며, 본 입지는 해당 요건을 충족합니다.`
-       : "주차 미확보. 창고형 모델의 필수 요건이 충족되지 않은 상태입니다."],
+       ? `${b.parking}. 주차 확보는 방문객 편의에 유리합니다.`
+       : hnbColocation
+         ? "주차 미확보. 올리브영·다이소 등 H&B 동선 입점 전략에서는 보행·집객이 우선이나, 방문 주차 여부는 현장 확인이 필요합니다."
+         : "주차 미확보. 차량 중심 교외 입지에서는 주차 확보가 중요합니다."],
     [b.areaPy >= 200 ? "ok" : (b.areaPy >= 150 ? "cond" : "no"),
      `매장 면적 — 임대 전용면적 확인 필요`,
      b.areaPy >= 200
@@ -1562,6 +1652,12 @@ function render(){
     ["배후 인구", displayValue(dm.population5km, "명"), dm.demandSource === "road" ? "도로명 구간 인구·세대 (5km 아님)" : "광역 인구·세대 기준", false],
     ["30–50대 비중", dm.age3050ratio == null ? "연령 데이터 연동 예정" : `${dm.age3050ratio}%`, dm.ageBasis || "해당 동 기준", false],
     ["아파트 단지", dm.aptComplexes == null ? "확인 필요" : `${fmt(dm.aptComplexes)}개 단지`, dm.note || "공공데이터·장소검색 기준", false],
+    ...(d.traffic?.metrics?.hospitalDistM != null
+      ? [["인근 병원", formatDistance(d.traffic.metrics.hospitalDistM), "조제·환자 유입 시너지 — 수요·유동·경쟁에 반영", false]]
+      : []),
+    ...(hnbColocation
+      ? [["H&B 동선 전략", "해당", "올리브영·다이소 등 리테일 동선 입점 — 보행·집객·뷰티 수요 가산", true]]
+      : []),
     ...((d.traffic?.metrics?.footTrafficProxy || 0) >= 0.4 || scoreResult.isPremiumHub || scoreResult.pharmacyOversaturated
       ? [["유동·상권 보정", scoreResult.pharmacyOversaturated ? "제한 반영" : "반영됨", scoreResult.pharmacyOversaturated
           ? `약국 과밀(1km ${c1.pharmacies}개소) — 유동 상권 가산을 제한하고 경쟁 리스크를 우선 반영`
