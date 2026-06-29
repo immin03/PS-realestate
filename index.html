@@ -879,7 +879,8 @@ function extractParkingFromRegistry(item) {
   const mechOut = toNumber(item.oudrMechUtcnt);
   const auto = autoIn + autoOut;
   const mech = mechIn + mechOut;
-  const total = auto + mech;
+  let total = auto + mech;
+  if (!total) total = toNumber(item.totPkngCnt);
   const detail = [];
   if (auto > 0) detail.push(`자주식 ${auto}대`);
   if (mech > 0) detail.push(`기계식 ${mech}대`);
@@ -3382,48 +3383,80 @@ function sumParkingFromRegistryItems(items) {
   };
 }
 
+function buildJibunJiCandidates(jiValue) {
+  const candidates = new Set();
+  const padded = String(jiValue ?? "0").padStart(4, "0");
+  const n = parseInt(padded, 10) || 0;
+  candidates.add(padded);
+  candidates.add(String(n).padStart(4, "0"));
+  if (n > 0) {
+    candidates.add(String(n - 1).padStart(4, "0"));
+    candidates.add(String(n - 2).padStart(4, "0"));
+    candidates.add(String(n + 1).padStart(4, "0"));
+  }
+  candidates.add("0000");
+  return [...candidates];
+}
+
+function collectRegistryParamBases(params, jusoWrap, addr) {
+  const bases = [];
+  const seen = new Set();
+  const pushBase = (p) => {
+    if (!p?.sigunguCd || !p?.bjdongCd || !p?.bun || p.bun === "0000") return;
+    const bun = String(p.bun).padStart(4, "0");
+    const key = `${p.sigunguCd}-${p.bjdongCd}-${bun}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    bases.push({ ...p, bun, platGbCd: p.platGbCd || "0" });
+  };
+
+  pushBase(params);
+  const fromAddr = parseJibunFromAddress(addr);
+  if (fromAddr.bun !== "0000") pushBase({ ...params, ...fromAddr });
+  if (jusoWrap?.first) pushBase(buildParamsFromJusoItem(params, jusoWrap.first));
+  for (const item of (jusoWrap?.items || []).slice(0, 8)) {
+    pushBase(buildParamsFromJusoItem(params, item));
+  }
+  return bases;
+}
+
+function expandRegistryJiVariants(base) {
+  const tries = [];
+  const seen = new Set();
+  for (const platGbCd of [base.platGbCd || "0", "1", "2"]) {
+    for (const ji of buildJibunJiCandidates(base.ji)) {
+      const key = `${base.sigunguCd}-${base.bjdongCd}-${base.bun}-${ji}-${platGbCd}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      tries.push({ ...base, ji, platGbCd });
+    }
+  }
+  return tries;
+}
+
 function buildingRegistryHasItems(wrap) {
-  return normalizeItems(wrap?.data?.response?.body?.items).length > 0;
+  return normalizeItems(wrap?.data?.response?.body?.items).length > 0
+    || normalizeItems(wrap?.recapData?.response?.body?.items).length > 0;
+}
+
+function getBuildingRegistryItems(wrap) {
+  const title = normalizeItems(wrap?.data?.response?.body?.items);
+  const recap = normalizeItems(wrap?.recapData?.response?.body?.items);
+  return [...recap, ...title];
 }
 
 async function resolveBuildingRegistry(params, jusoWrap, addr = "") {
-  const tries = [];
-  const seen = new Set();
-  const pushTry = (p) => {
-    const key = `${p.sigunguCd}-${p.bjdongCd}-${p.bun}-${p.ji}-${p.platGbCd || "0"}`;
-    if (!p.sigunguCd || !p.bjdongCd || seen.has(key)) return;
-    seen.add(key);
-    tries.push({ ...p, platGbCd: p.platGbCd || "0" });
-  };
-
-  pushTry(params);
-  const fromAddr = parseJibunFromAddress(addr);
-  if (fromAddr.bun !== "0000") pushTry({ ...params, ...fromAddr });
-  if (jusoWrap?.first) pushTry(buildParamsFromJusoItem(params, jusoWrap.first));
-  for (const item of (jusoWrap?.items || []).slice(0, 8)) {
-    pushTry(buildParamsFromJusoItem(params, item));
-  }
-
+  const bases = collectRegistryParamBases(params, jusoWrap, addr);
   let lastWrap = null;
   let lastParams = params;
-  for (const p of tries) {
-    if (!p.sigunguCd || !p.bjdongCd) continue;
-    const wrap = await callBuildingApi(p);
-    lastWrap = wrap;
-    lastParams = p;
-    if (buildingRegistryHasItems(wrap)) return { wrap, params: p };
-  }
 
-  for (const platGbCd of ["1", "2"]) {
-    const p = { ...params, platGbCd };
-    if (!p.sigunguCd || !p.bjdongCd) continue;
-    const key = `${p.sigunguCd}-${p.bjdongCd}-${p.bun}-${p.ji}-${platGbCd}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const wrap = await callBuildingApi(p);
-    lastWrap = wrap;
-    lastParams = p;
-    if (buildingRegistryHasItems(wrap)) return { wrap, params: p };
+  for (const base of bases) {
+    for (const p of expandRegistryJiVariants(base)) {
+      const wrap = await callBuildingApi(p);
+      lastWrap = wrap;
+      lastParams = p;
+      if (buildingRegistryHasItems(wrap)) return { wrap, params: p };
+    }
   }
 
   return { wrap: lastWrap, params: lastParams };
@@ -4142,7 +4175,7 @@ async function applyAgePopulationData(params, addr) {
 }
 
 function applyBuildingData(buildingResponse) {
-  const items = normalizeItems(buildingResponse?.data?.response?.body?.items);
+  const items = getBuildingRegistryItems(buildingResponse);
   const item = pickBestBuildingRegistryItem(items);
 
   DATA.building.registryMissing = !item;
@@ -4161,8 +4194,8 @@ function applyBuildingData(buildingResponse) {
     DATA.building.approvedYear = Number(String(item.useAprDay).slice(0, 4)) || DATA.building.approvedYear;
   }
 
-  const grndFlrCnt = toNumber(item.grndFlrCnt);
-  const ugrndFlrCnt = toNumber(item.ugrndFlrCnt);
+  const grndFlrCnt = Math.max(...items.map(it => toNumber(it.grndFlrCnt)), toNumber(item.grndFlrCnt));
+  const ugrndFlrCnt = Math.max(...items.map(it => toNumber(it.ugrndFlrCnt)), toNumber(item.ugrndFlrCnt));
 
   if (grndFlrCnt) {
     DATA.building.floor = `지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;

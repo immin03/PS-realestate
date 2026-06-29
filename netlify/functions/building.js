@@ -32,11 +32,18 @@ exports.handler = async function (event) {
     `&ji=${encodeURIComponent(ji)}` +
     `&_type=json`;
 
-  // 1. 표제부: 기존에 잘 나오던 기본 건물정보
+  // 1. 표제부: 기본 건물정보
   const titleUrl =
     "https://apis.data.go.kr/1613000/BldRgstHubService/getBrTitleInfo" +
     commonParams +
-    `&numOfRows=10` +
+    `&numOfRows=100` +
+    `&pageNo=1`;
+
+  // 1-2. 총괄표제부: 단지·지식산업센터 등
+  const recapUrl =
+    "https://apis.data.go.kr/1613000/BldRgstHubService/getBrRecapTitleInfo" +
+    commonParams +
+    `&numOfRows=100` +
     `&pageNo=1`;
 
   // 2. 층별개요: 층별 용도/면적 후보
@@ -54,8 +61,14 @@ exports.handler = async function (event) {
     `&pageNo=1`;
 
   try {
-    // 표제부는 기존 화면의 핵심 데이터라 반드시 먼저 조회합니다.
-    const titleResult = await fetchJson(titleUrl);
+    // 표제부는 핵심 데이터 — 총괄표제부는 병행 조회
+    const [titleResult, recapResult] = await Promise.all([
+      fetchJson(titleUrl),
+      fetchJsonWithTimeout(recapUrl, 8000).catch(err => ({ error: err.message }))
+    ]);
+
+    const recapData = recapResult?.error ? null : recapResult;
+    const recapError = recapResult?.error || null;
 
     // 층별개요는 실패해도 전체 실패로 보지 않습니다.
     let floorResult = null;
@@ -81,9 +94,12 @@ exports.handler = async function (event) {
       ok: true,
       type: "building",
       requestUrl: titleUrl.replace(DATA_KEY, "HIDDEN_KEY"),
+      recapRequestUrl: recapUrl.replace(DATA_KEY, "HIDDEN_KEY"),
       floorRequestUrl: floorUrl.replace(DATA_KEY, "HIDDEN_KEY"),
       exposeRequestUrl: exposeUrl.replace(DATA_KEY, "HIDDEN_KEY"),
       data: titleResult,
+      recapData,
+      recapError,
       floorData: floorResult,
       floorError,
       exposeData: exposeResult,
