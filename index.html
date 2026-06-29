@@ -334,8 +334,16 @@
   .radius-toggle button.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
   #map{ width:100%; height:340px; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--wash); }
   #map svg{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#444; }
-  .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
+  .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#444; align-items:center; }
+  .dot{
+    display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:5px; vertical-align:-1px;
+    border:1.5px solid #fff; box-shadow:0 0 0 1px rgba(0,0,0,0.12);
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;
+  }
+  .dot-ph{ background:#1D9E75; }
+  .dot-wh{ background:#C8102E; }
+  .dot-hb{ background:#B97515; }
+  .map-radius-print{ display:none; font-size:12px; color:var(--gray); font-weight:600; }
   .legend b{ font-weight:700; font-variant-numeric:tabular-nums; }
 
   /* price table */
@@ -374,6 +382,18 @@
       print-color-adjust: exact;
     }
     section{ margin-top:28px; }
+    .map-head{
+      page-break-after:avoid; break-after:avoid;
+      margin-bottom:8px; padding:8px 12px;
+      border:1px solid #ccc; border-radius:6px; background:#f7f7f4;
+      -webkit-print-color-adjust:exact; print-color-adjust:exact;
+    }
+    .legend{ gap:18px; font-size:12px; color:#222; }
+    .legend .dot{ width:11px; height:11px; }
+    .dot-ph{ background:#1D9E75 !important; }
+    .dot-wh{ background:#C8102E !important; }
+    .dot-hb{ background:#B97515 !important; }
+    .map-radius-print{ display:inline-block; margin-left:auto; color:#444; }
     #map{ height:300px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     #map *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
@@ -661,10 +681,11 @@ const TYPE_PROFILES = {
     <div class="sec-lead">반경 내 약국 · 창고형 약국 · H&amp;B(뷰티) 분포를 평가합니다. <b>명동·강남 중심</b>과 <b>가로수길·신사</b> 등은 유동·관광 POI 데이터로 활성도를 구분하며, H&amp;B는 제품 포트폴리오(뷰티 약 30%) 관점에서 수요·경쟁을 함께 반영합니다.</div>
     <div class="map-head">
       <div class="legend">
-        <span><span class="dot" style="background:var(--teal)"></span>약국 <b id="cntPh">—</b></span>
-        <span><span class="dot" style="background:var(--red)"></span>창고형 약국 <b id="cntWh">—</b></span>
-        <span><span class="dot" style="background:var(--amber)"></span>H&amp;B·뷰티 <b id="cntHb">—</b></span>
+        <span><span class="dot dot-ph" aria-hidden="true"></span>약국 <b id="cntPh">—</b></span>
+        <span><span class="dot dot-wh" aria-hidden="true"></span>창고형 약국 <b id="cntWh">—</b></span>
+        <span><span class="dot dot-hb" aria-hidden="true"></span>H&amp;B·뷰티 <b id="cntHb">—</b></span>
       </div>
+      <span class="map-radius-print" id="mapRadiusPrint" aria-hidden="true"></span>
       <div class="radius-toggle" id="radiusToggle"></div>
     </div>
     <div id="map"></div>
@@ -2795,6 +2816,8 @@ function renderCompetition(rk){
   $("cntPh").textContent = c.pharmacies;
   $("cntWh").textContent = c.warehouse;
   $("cntHb").textContent = c.hnb;
+  const radiusPrint = $("mapRadiusPrint");
+  if (radiusPrint) radiusPrint.textContent = `반경 ${rk}`;
   document.querySelectorAll("#radiusToggle button").forEach(btn=>
     btn.classList.toggle("on", btn.dataset.r===rk));
 
