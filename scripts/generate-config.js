@@ -25,8 +25,8 @@ function loadEnvFile(path) {
 const env = { ...loadEnvFile(".env"), ...process.env };
 
 const local = {
-  ACCESS_CODE: env.ACCESS_CODE || "",
-  KAKAO_JS_KEY: env.KAKAO_JS_KEY || ""
+  ACCESS_CODE: (env.ACCESS_CODE || "").trim(),
+  KAKAO_JS_KEY: (env.KAKAO_JS_KEY || "").trim()
 };
 
 writeFileSync(

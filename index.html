@@ -39,7 +39,22 @@
   .wordmark{ font-weight:700; letter-spacing:0.42em; font-size:17px; }
   .logo-img{ height:30px; width:auto; display:block; object-fit:contain; }
   .logo-img.sm{ height:24px; }
-  .logo-img.footer{ height:18px; opacity:0.85; }
+  .logo-img.gate{ height:26px; margin:0 auto; }
+  .logo-img.letter{ height:22px; }
+  .logo-img.footer{ height:16px; }
+  .logo-panel{ background:#0a0a0a; padding:10px 16px; border-radius:6px; display:inline-flex; align-items:center; }
+  .logo-panel.footer{ padding:6px 12px; border-radius:4px; }
+  .gate-overlay{ position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .gate-card{ max-width:400px; width:100%; border-radius:12px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 12px 40px rgba(0,0,0,0.08); background:var(--paper); }
+  .gate-card-head{ background:#0a0a0a; padding:36px 32px 28px; text-align:center; }
+  .gate-card-body{ padding:32px 36px 40px; text-align:center; }
+  .confidential.light{ color:rgba(255,255,255,0.5); margin-top:10px; }
+  .gate-lead{ font-size:13.5px; color:#444; margin:0 0 18px; line-height:1.65; }
+  .gate-input{ width:100%; height:46px; border:1px solid var(--hairline); border-radius:8px; padding:0 14px; font-size:15px; font-family:inherit; text-align:center; letter-spacing:0.06em; }
+  .gate-input:focus{ outline:none; border-color:var(--ink); }
+  .gate-input.err{ border-color:var(--red); }
+  #gateErr{ font-size:12px; color:var(--red); margin-top:10px; min-height:18px; visibility:hidden; }
+  #gateErr.show{ visibility:visible; }
   .recent-searches{ max-width:900px; margin:6px auto 0; padding:0 16px; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
   .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; }
   .recent-searches button{ border:1px solid var(--hairline); background:var(--paper); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -173,6 +188,7 @@ const CONFIG = {
   ...window.APP_CONFIG,
   ...(window.APP_CONFIG_LOCAL || {})
 };
+if (CONFIG.ACCESS_CODE) CONFIG.ACCESS_CODE = String(CONFIG.ACCESS_CODE).trim();
 
 /* 건물 유형 프로파일 — 유형별 수요 특성·체크포인트·점수 보정 */
 const TYPE_PROFILES = {
@@ -215,16 +231,65 @@ const TYPE_PROFILES = {
 };
 </script>
 
-<div id="gate" style="position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--paper); border:1px solid var(--hairline); padding:48px 40px; max-width:380px; width:100%; text-align:center;">
-    <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img sm" style="margin:0 auto;">
-    <div class="confidential" style="margin-top:6px;">Strictly Private &amp; Confidential</div>
-    <p style="font-size:13.5px; color:#444; margin:24px 0 14px;">본 리포트는 관계자 전용 자료입니다.<br>전달받으신 접속 코드를 입력해 주세요.</p>
-    <input type="password" id="gateInput" placeholder="접속 코드" style="width:100%; height:44px; border:1px solid var(--hairline); border-radius:8px; padding:0 14px; font-size:14px; font-family:inherit; text-align:center;">
-    <button class="btn" id="gateBtn" style="width:100%; margin-top:10px;">확인</button>
-    <p id="gateErr" style="font-size:12px; color:var(--red); margin-top:10px; visibility:hidden;">접속 코드가 올바르지 않습니다.</p>
+<div id="gate" class="gate-overlay">
+  <div class="gate-card">
+    <div class="gate-card-head">
+      <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img gate">
+      <div class="confidential light">Strictly Private &amp; Confidential</div>
+    </div>
+    <div class="gate-card-body">
+      <p class="gate-lead">본 리포트는 관계자 전용 자료입니다.<br>전달받으신 접속 코드를 입력해 주세요.</p>
+      <input type="text" id="gateInput" class="gate-input" placeholder="접속 코드" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
+      <button class="btn" id="gateBtn" type="button" style="width:100%; margin-top:12px; height:46px;">확인</button>
+      <p id="gateErr">접속 코드가 올바르지 않습니다. 대소문자 구분 없이 다시 입력해 주세요.</p>
+    </div>
   </div>
 </div>
+<script>
+(function initGate() {
+  const gate = document.getElementById("gate");
+  const input = document.getElementById("gateInput");
+  const btn = document.getElementById("gateBtn");
+  const err = document.getElementById("gateErr");
+  if (!gate || !input || !btn) return;
+
+  const expected = String(CONFIG.ACCESS_CODE || "").trim();
+
+  function unlock() {
+    gate.style.display = "none";
+    try { sessionStorage.setItem("ps_ok", "1"); } catch {}
+  }
+
+  function showGateError() {
+    err.classList.add("show");
+    input.classList.add("err");
+    input.value = "";
+    input.focus();
+  }
+
+  function tryGate() {
+    err.classList.remove("show");
+    input.classList.remove("err");
+    if (!expected) { unlock(); return; }
+    const entered = String(input.value || "").trim();
+    if (entered && entered.toUpperCase() === expected.toUpperCase()) {
+      unlock();
+      return;
+    }
+    showGateError();
+  }
+
+  btn.addEventListener("click", tryGate);
+  input.addEventListener("keydown", e => { if (e.key === "Enter") tryGate(); });
+  input.addEventListener("input", () => {
+    err.classList.remove("show");
+    input.classList.remove("err");
+  });
+
+  if (!expected || sessionStorage.getItem("ps_ok") === "1") unlock();
+  else input.focus();
+})();
+</script>
 
 <div class="toolbar">
   <input type="text" id="addrInput" value="" placeholder="주소 입력 (도로명·지번)">
@@ -241,7 +306,7 @@ const TYPE_PROFILES = {
 <div class="sheet" id="report">
 
   <div class="letterhead">
-    <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img">
+    <div class="logo-panel"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img letter"></div>
     <div class="confidential">Strictly Private &amp; Confidential</div>
   </div>
 
@@ -379,7 +444,7 @@ const TYPE_PROFILES = {
     본 자료는 파마스퀘어 사업 모델 관련 사업 협력 검토 목적의 참고자료로서 작성되었으며, 제공된 내용은 현재 시점에서의 가정, 시장 환경, 내부 분석 및 제한된 정보에 기반하여 작성되었습니다.
     본 자료에 포함된 수치는 추정치로서 실제 운영 환경, 입지 조건, 시장 상황 등에 따라 상당한 차이가 발생할 수 있으며, 특정 성과 또는 수익을 보장하지 않습니다.
     본 자료에 포함된 모든 정보는 기밀 정보로서 사전 서면 동의 없이 제3자에게 제공, 복제 또는 공개될 수 없습니다.
-    <div class="ftr-row"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img footer"><span id="ftrDate">—</span></div>
+    <div class="ftr-row"><div class="logo-panel footer"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img footer"></div><span id="ftrDate">—</span></div>
   </div>
 </div>
 
@@ -2706,21 +2771,6 @@ $("modeExternal").addEventListener("click", ()=>{
 });
 if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
 renderRecentSearches();
-
-/* ---- 접속 코드 게이트 ---- */
-function unlock(){
-  $("gate").style.display = "none";
-  sessionStorage.setItem("ps_ok", "1");
-}
-function tryGate(){
-  if (!CONFIG.ACCESS_CODE) { unlock(); return; }
-  if ($("gateInput").value === CONFIG.ACCESS_CODE) unlock();
-  else { $("gateErr").style.visibility = "visible"; $("gateInput").value = ""; $("gateInput").focus(); }
-}
-$("gateBtn").addEventListener("click", tryGate);
-$("gateInput").addEventListener("keydown", e => { if (e.key === "Enter") tryGate(); });
-if (!CONFIG.ACCESS_CODE || sessionStorage.getItem("ps_ok") === "1") unlock();
-else $("gateInput").focus();
 
 render();
 </script>
