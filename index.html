@@ -18,14 +18,16 @@
 
   /* ===== Toolbar (screen only) ===== */
   .page-chrome{
-    max-width:var(--page-max); margin:0 auto; padding:20px var(--page-pad) 0;
+    max-width:var(--page-max); width:100%; margin:0 auto;
+    padding:20px var(--page-pad) 12px;
   }
   .toolbar{
     display:flex; flex-direction:column; gap:10px; align-items:stretch;
   }
-  .toolbar-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; width:100%; }
   .toolbar-row-address{ width:100%; }
   .toolbar-row-options{ width:100%; }
+  .toolbar-row-options .btn.ghost{ margin-left:auto; }
   .addr-field-wrap{ position:relative; flex:1; min-width:min(100%, 420px); }
   #addrInput{
     width:100%; height:44px; border:1px solid var(--hairline); border-radius:8px;
@@ -96,7 +98,7 @@
   }
   .lease-floor-hint{ font-size:11px; color:#999; flex:1 1 100%; }
   .site-detail-bar{
-    max-width:var(--page-max); margin:12px auto 0; padding:14px var(--page-pad);
+    width:100%; margin:12px 0 0; padding:14px 16px;
     background:var(--paper); border:1px solid var(--hairline); border-radius:10px;
     display:none;
   }
@@ -148,7 +150,7 @@
   .store-model button.on{ background:var(--teal); color:#fff; }
   body:not(.store-franchise) .sec-lead-franchise, body:not(.store-franchise) .franchise-tone{ display:none !important; }
   body.store-franchise .sec-lead-direct, body.store-franchise .direct-tone{ display:none !important; }
-  .demo-note{ max-width:var(--page-max); margin:8px auto 0; padding:0 var(--page-pad); font-size:12px; color:var(--gray); }
+  .demo-note{ margin:8px 0 0; font-size:12px; color:var(--gray); }
   .demo-note b{ color:var(--red); font-weight:600; }
   .scenario-note{
     margin-bottom:14px; padding:12px 16px; border-radius:8px;
@@ -161,7 +163,7 @@
   }
 
   /* ===== Report sheet ===== */
-  .sheet{ max-width:var(--page-max); margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
+  .sheet{ max-width:var(--page-max); width:calc(100% - 2 * var(--page-pad)); margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
           padding:56px 64px 48px; }
   @media (max-width:720px){ .sheet{ padding:32px 20px; } }
 
@@ -184,10 +186,26 @@
   .gate-btn{ width:100%; margin-top:14px; height:48px; font-size:15px; }
   #gateErr{ font-size:12px; color:var(--red); margin-top:12px; min-height:18px; line-height:1.5; visibility:hidden; }
   #gateErr.show{ visibility:visible; }
-  .recent-searches{ max-width:var(--page-max); margin:6px auto 0; padding:0 var(--page-pad); display:none; gap:6px; flex-wrap:wrap; align-items:center; }
-  .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; }
-  .recent-searches button{ border:1px solid var(--hairline); background:var(--paper); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .recent-searches button:hover{ border-color:var(--ink); color:var(--ink); }
+  .recent-searches{ margin:8px 0 0; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
+  .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; margin-right:2px; }
+  .recent-chip{
+    display:inline-flex; align-items:center; max-width:min(100%, 280px);
+    border:1px solid var(--hairline); background:var(--paper); border-radius:999px;
+    overflow:hidden;
+  }
+  .recent-chip-label{
+    border:none; background:transparent; padding:5px 4px 5px 12px;
+    font-size:12px; cursor:pointer; font-family:inherit; color:#444;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;
+  }
+  .recent-chip-label:hover{ color:var(--ink); }
+  .recent-chip:hover{ border-color:#bbb; }
+  .recent-chip-remove{
+    flex-shrink:0; border:none; background:transparent;
+    padding:5px 10px 5px 2px; font-size:15px; line-height:1; cursor:pointer;
+    font-family:inherit; color:#aaa;
+  }
+  .recent-chip-remove:hover{ color:var(--red); }
   body.external .internal-tone{ display:none !important; }
   body:not(.external) .external-tone{ display:none !important; }
   body.external .sec-lead-internal{ display:none; }
@@ -305,7 +323,8 @@
   .metric-approx{ font-size:0.72em; font-weight:600; color:var(--gray); margin-right:0.12em; }
   .metric-num{ letter-spacing:-0.02em; }
   .metric .d{ font-size:11.5px; color:var(--gray); margin-top:1px; }
-  .metric.hl{ background:var(--peach); }
+  /* 메트릭 카드는 배경 통일 — 강조는 종합 등급(seal) 등 핵심 UI에만 사용 */
+  .metric.hl{ background:var(--wash); }
 
   /* map */
   .map-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px; }
@@ -314,6 +333,7 @@
         border-radius:999px; cursor:pointer; font-family:inherit; color:var(--gray); }
   .radius-toggle button.on{ background:var(--ink); color:#fff; border-color:var(--ink); }
   #map{ width:100%; height:340px; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--wash); }
+  #map svg{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   .legend{ display:flex; gap:16px; flex-wrap:wrap; font-size:12.5px; color:#444; }
   .dot{ display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:5px; vertical-align:-1px; }
   .legend b{ font-weight:700; font-variant-numeric:tabular-nums; }
@@ -354,7 +374,8 @@
       print-color-adjust: exact;
     }
     section{ margin-top:28px; }
-    #map{ height:300px; }
+    #map{ height:300px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    #map *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
   }
 </style>
 <script src="config.js"></script>
@@ -475,7 +496,7 @@ const TYPE_PROFILES = {
 
 <div class="page-chrome">
 <div class="app-head">
-  <h2 class="app-head-title title-with-beta">출점 입지 분석 리포트<span class="beta-badge" aria-label="베타 버전">BETA</span></h2>
+  <h2 class="app-head-title title-with-beta">출점 입지 분석<span class="beta-badge" aria-label="베타 버전">BETA</span></h2>
   <div class="app-head-byline">PHAMA SQUARE</div>
 </div>
 <div class="toolbar">
@@ -498,7 +519,6 @@ const TYPE_PROFILES = {
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
   </div>
   </div>
-</div>
 <div class="site-detail-bar" id="siteDetailBar">
   <div class="site-detail-head">
     <span class="site-detail-title">건물·출점 조건</span>
@@ -539,6 +559,7 @@ const TYPE_PROFILES = {
 </div>
 <p class="demo-note" id="demoNote">주소를 입력한 뒤 <b>분석</b>을 실행하세요. <b>건물 총면적</b>은 대장에서 자동 조회되고, <b>출점평수</b>(임대 전용면적)는 직접 입력합니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
+</div>
 
 <div class="sheet" id="report">
 
@@ -2303,6 +2324,14 @@ function saveRecentSearch(addr) {
   renderRecentSearches();
 }
 
+function removeRecentSearch(addrKey) {
+  const list = loadRecentSearches()
+    .map(normalizeRecentEntry)
+    .filter(e => e.addrKey !== addrKey);
+  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+  renderRecentSearches();
+}
+
 function renderRecentSearches() {
   const box = $("recentSearches");
   if (!box) return;
@@ -2314,15 +2343,26 @@ function renderRecentSearches() {
   box.style.display = "flex";
   box.innerHTML =
     `<span class="lbl">최근 검색</span>` +
-    list.map(e => `<button type="button" title="${escapeHtml(e.addr)}">${escapeHtml(e.addr)}</button>`).join("");
-  box.querySelectorAll("button").forEach((btn, i) => {
-    btn.addEventListener("click", () => {
-      const entry = list[i];
+    list.map(e =>
+      `<span class="recent-chip" data-key="${escapeHtml(e.addrKey)}">` +
+        `<button type="button" class="recent-chip-label" title="${escapeHtml(e.addr)}">${escapeHtml(e.addr)}</button>` +
+        `<button type="button" class="recent-chip-remove" aria-label="${escapeHtml(e.addr)} 삭제" title="삭제">×</button>` +
+      `</span>`
+    ).join("");
+  box.querySelectorAll(".recent-chip").forEach(chip => {
+    const key = chip.dataset.key;
+    const entry = list.find(e => e.addrKey === key);
+    if (!entry) return;
+    chip.querySelector(".recent-chip-label")?.addEventListener("click", () => {
       onAddressContextChange(entry.addr);
       $("addrInput").value = entry.addr;
       pendingSiteContext = entry.context;
       hideAddrSuggest();
       $("addrInput")?.focus();
+    });
+    chip.querySelector(".recent-chip-remove")?.addEventListener("click", ev => {
+      ev.stopPropagation();
+      removeRecentSearch(key);
     });
   });
 }
@@ -2670,7 +2710,7 @@ function render(){
           ? `핵심 유동 상권 — 관광·집객 POI 기반으로 배후 수요·경쟁 점수를 보완`
           : "관광·유동 상권 — 세대수 외 유동 인구 가산", true]]
       : [])
-  ].map(m=>`<div class="metric ${m[3]?"hl":""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+  ].map(m=>`<div class="metric"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
 
   /* V. 유동·집객력 */
   const t = d.traffic;
@@ -2724,7 +2764,7 @@ function render(){
       ["인근 임대 시세", `${u.marketRentPy}만원/평`, u.marketRentSource, false],
       ["임대 대비 수익(예상)", formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal),
         `공실 시 임대 ${formatManwon(u.leasingIncome)} 대비 직접운영 이익 구간`, true]
-    ].map(m => `<div class="metric ${m[3] ? "hl" : ""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+    ].map(m => `<div class="metric"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   } else {
     if ($("franchiseScenarioNote")) $("franchiseScenarioNote").innerHTML = "";
     if ($("franchiseEconGrid")) $("franchiseEconGrid").innerHTML = "";
@@ -2733,7 +2773,7 @@ function render(){
     ["평당 매매 실거래가", p.salePerPy > 0 ? fmt(p.salePerPy)+"만원" : "확인 필요", `반경 ${tradeKm}km 내 최근 12개월 평균`, true],
     [franchiseMode ? "인근 임대 시세(추정)" : "평당 임대료(월)", p.rentPerPy == null ? "추정 불가" : `${p.rentPerPy}만원`, franchiseMode ? "공실 대비 임대 전망 참고" : (p.rentSource || "매매 실거래 기반 추정"), false],
     ["최근 12개월 거래", p.deals12mo+"건", franchiseMode ? `반경 ${tradeKm}km — 거래량이 많을수록 시세·공실 판단에 유리` : `반경 ${tradeKm}km 내 참고`, false]
-  ].map(m=>`<div class="metric ${m[3]?"hl":""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+  ].map(m=>`<div class="metric"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   $("dealRows").innerHTML = p.deals.length
     ? p.deals.map(r =>
         `<tr><td>${r[0]}</td><td>${r[1]}</td><td class="num">${r[2]}</td><td class="num">${r[3]}</td><td class="num">${r[4]}</td></tr>`).join("")
@@ -2798,8 +2838,61 @@ function drawMockMap(rk, c){
 /* ---- 카카오맵 실연동 ---- */
 let kakaoMapObj = null;
 let kakaoSdkPromise = null;
+let kakaoMapMarkers = [];
 
 let kakaoSdkReady = false;
+
+const MAP_MARKER_COLORS = {
+  pharmacy: "#1D9E75",
+  warehouse: "#C8102E",
+  hnb: "#B97515"
+};
+const mapMarkerImageCache = {};
+
+function clearKakaoMapMarkers() {
+  kakaoMapMarkers.forEach(m => m.setMap(null));
+  kakaoMapMarkers = [];
+}
+
+function createMapMarkerImage(color) {
+  if (mapMarkerImageCache[color]) return mapMarkerImageCache[color];
+  if (!window.kakao?.maps) return null;
+  const canvas = document.createElement("canvas");
+  canvas.width = 20;
+  canvas.height = 20;
+  const ctx = canvas.getContext("2d");
+  ctx.beginPath();
+  ctx.arc(10, 10, 7, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = "#ffffff";
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(0,0,0,0.18)";
+  ctx.stroke();
+  const image = new kakao.maps.MarkerImage(
+    canvas.toDataURL("image/png"),
+    new kakao.maps.Size(20, 20),
+    { offset: new kakao.maps.Point(10, 10) }
+  );
+  mapMarkerImageCache[color] = image;
+  return image;
+}
+
+function addColoredMapMarkers(map, list, color) {
+  const image = createMapMarkerImage(color);
+  if (!image || !list?.length) return;
+  list.forEach(p => {
+    const marker = new kakao.maps.Marker({
+      map,
+      position: new kakao.maps.LatLng(p.y, p.x),
+      image,
+      title: p.place_name || ""
+    });
+    kakaoMapMarkers.push(marker);
+  });
+}
 
 function loadKakaoSDK() {
   if (kakaoSdkReady && window.kakao && window.kakao.maps) return Promise.resolve();
@@ -2910,16 +3003,13 @@ function drawKakaoMap(rk){
     const center = new kakao.maps.LatLng(DATA.mapCenter.lat, DATA.mapCenter.lng);
     const level = { "1km":6, "2km":7, "5km":8 }[rk];
     $("map").innerHTML = "";
+    clearKakaoMapMarkers();
     kakaoMapObj = new kakao.maps.Map($("map"), { center, level });
     new kakao.maps.Circle({ map:kakaoMapObj, center, radius:radiusM,
       strokeWeight:1, strokeColor:"#1D9E75", strokeStyle:"dashed", fillColor:"#1D9E75", fillOpacity:0.05 });
-    new kakao.maps.Marker({ map:kakaoMapObj, position:center });
+    const siteMarker = new kakao.maps.Marker({ map:kakaoMapObj, position:center });
+    kakaoMapMarkers.push(siteMarker);
     const places = new kakao.maps.services.Places();
-    const addMarkers = (list, color)=> list.forEach(p=>{
-      new kakao.maps.CustomOverlay({ map:kakaoMapObj,
-        position:new kakao.maps.LatLng(p.y,p.x),
-        content:`<div title="${p.place_name}" style="width:12px;height:12px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.15)"></div>` });
-    });
     let phAll = [];
     const fetchPage = (page)=> places.categorySearch("PM9", (res, status, pag)=>{
       if (status !== kakao.maps.services.Status.OK) return finalize();
@@ -2929,11 +3019,12 @@ function drawKakaoMap(rk){
     const finalize = ()=>{
       const wh = phAll.filter(p => classifyWarehousePharmacy(p).isWarehouse);
       const normal = phAll.filter(p => !wh.includes(p));
-      addMarkers(normal, "#1D9E75"); addMarkers(wh, "#C8102E");
+      addColoredMapMarkers(kakaoMapObj, normal, MAP_MARKER_COLORS.pharmacy);
+      addColoredMapMarkers(kakaoMapObj, wh, MAP_MARKER_COLORS.warehouse);
       let hbAll = [], done = 0;
       CONFIG.HB_KEYWORDS.forEach(kw=> places.keywordSearch(kw, (res, status)=>{
         if (status === kakao.maps.services.Status.OK) hbAll = hbAll.concat(res);
-        if (++done === CONFIG.HB_KEYWORDS.length) addMarkers(hbAll, "#B97515");
+        if (++done === CONFIG.HB_KEYWORDS.length) addColoredMapMarkers(kakaoMapObj, hbAll, MAP_MARKER_COLORS.hnb);
       }, { location:center, radius:radiusM }));
     };
     fetchPage(1);
@@ -2948,6 +3039,10 @@ function drawKakaoMap(rk){
   btn.textContent = rk; btn.dataset.r = rk;
   btn.addEventListener("click", ()=> renderCompetition(rk));
   $("radiusToggle").appendChild(btn);
+});
+
+window.addEventListener("beforeprint", () => {
+  if (kakaoMapObj?.relayout) kakaoMapObj.relayout();
 });
 
 /* =========================================================
