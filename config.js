@@ -110,6 +110,12 @@ window.APP_CONFIG = {
       NO_PARKING_MAX_TOTAL: 72,
       RENT_2X_MAX_TOTAL: 78,
       AREA_UNDER_120_MAX_TOTAL: 70
+    },
+    FRANCHISE: {
+      MARKET_DEALS_HIGH: 6,
+      MARKET_DEALS_MID: 3,
+      LEASING_SWEET_MIN: 0.65,
+      LEASING_SWEET_MAX: 1.35
     }
   }
 };

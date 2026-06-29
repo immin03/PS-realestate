@@ -27,7 +27,11 @@
   .mode{ display:flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--paper); }
   .mode button{ border:none; background:transparent; padding:0 14px; height:40px; font-size:13px; cursor:pointer; font-family:inherit; color:var(--gray); }
   .mode button.on{ background:var(--ink); color:#fff; }
-  .demo-note{ max-width:900px; margin:8px auto 0; padding:0 16px; font-size:12px; color:var(--gray); }
+  .store-model{ display:flex; border:1px solid var(--hairline); border-radius:8px; overflow:hidden; background:var(--paper); }
+  .store-model button{ border:none; background:transparent; padding:0 12px; height:40px; font-size:12px; cursor:pointer; font-family:inherit; color:var(--gray); white-space:nowrap; }
+  .store-model button.on{ background:var(--teal); color:#fff; }
+  body:not(.store-franchise) .sec-lead-franchise, body:not(.store-franchise) .franchise-tone{ display:none !important; }
+  body.store-franchise .sec-lead-direct, body.store-franchise .direct-tone{ display:none !important; }
   .demo-note b{ color:var(--red); font-weight:600; }
 
   /* ===== Report sheet ===== */
@@ -304,13 +308,17 @@ const TYPE_PROFILES = {
 <div class="toolbar">
   <input type="text" id="addrInput" value="" placeholder="주소 입력 (도로명·지번)">
   <button class="btn" id="runBtn">분석</button>
+  <div class="store-model" title="출점 검토 기준을 선택합니다">
+    <button id="storeDirect" class="on">직영 출점</button>
+    <button id="storeFranchise">가맹 출점</button>
+  </div>
   <div class="mode" title="가맹점주 제공용은 내부 메모가 숨겨집니다">
     <button id="modeInternal" class="on">내부 검토용</button>
     <button id="modeExternal">가맹점주 제공용</button>
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
 </div>
-<p class="demo-note" id="demoNote">주소만 입력하고 <b>분석</b>을 누르면 건물 유형·임대료·주변 상권이 자동 분석됩니다.</p>
+<p class="demo-note" id="demoNote">주소와 <b>출점 기준(직영/가맹)</b>을 선택한 뒤 <b>분석</b>을 누르면 건물 유형·상권·적합도가 자동 분석됩니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -327,6 +335,7 @@ const TYPE_PROFILES = {
     <div class="doc-sub internal-tone">내부 검토용 — 본사 출점 기준(v2)에 따른 적나라한 평가입니다. 가맹점주 제공 전 반드시 「가맹점주 제공용」 모드로 전환해 문구를 확인하세요.</div>
   </div>
   <div class="doc-meta">
+    <span>출점 기준 <b id="mStoreModel">직영</b></span>
     <span>대상지 <b id="mAddr">—</b></span>
     <span>작성일 <b id="mDate">—</b></span>
     <span>작성 <b>파마스퀘어 출점전략팀</b></span>
@@ -347,8 +356,10 @@ const TYPE_PROFILES = {
   <section>
     <div class="sec-label">II. Overall Feasibility</div>
     <div class="sec-title">종합 적합도</div>
-    <div class="sec-lead sec-lead-external">5개 평가 축(배후 수요·유동·경쟁·경제성·물리 조건)을 본사 표준 가중치로 합산한 결과입니다. 공공데이터와 실거래가를 기반으로 작성되었으며, 점수는 출점 검토의 참고 자료입니다.</div>
-    <div class="sec-lead sec-lead-internal">5개 평가 축 가중 합산(v2) — 거리 가중 경쟁·유형별 물리 기준·데이터 신뢰도·리스크 상한을 반영합니다. 점수는 내부 검토 우선순위이며, 리스크 상한은 자동 적용됩니다.</div>
+    <div class="sec-lead sec-lead-external direct-tone">5개 평가 축(배후 수요·유동·경쟁·경제성·물리 조건)을 본사 표준 가중치로 합산한 결과입니다. <b>직영 출점</b> 기준으로 임대료·손익 모델 대비 수익성을 반영합니다.</div>
+    <div class="sec-lead sec-lead-external franchise-tone">5개 평가 축을 합산한 결과입니다. <b>가맹 출점(건물주 보유)</b> 기준으로 본사 손익 대신 <b>상권 사업성·주변 시세·임대 전망</b>을 평가합니다.</div>
+    <div class="sec-lead sec-lead-internal direct-tone">5개 평가 축 가중 합산(v2) — 직영 기준 임대·손익, 거리 가중 경쟁·리스크 상한 반영.</div>
+    <div class="sec-lead sec-lead-internal franchise-tone">5개 평가 축 가중 합산(v2) — 가맹(건물주) 기준: 경제성 축은 <b>사업성·임대 전망</b>으로 대체, 임대료 상한 리스크 미적용.</div>
     <div class="verdict-wrap">
       <div class="seal"><div class="g" id="gradeBig">—</div><div class="s">GRADE</div></div>
       <div class="verdict-body">
@@ -423,8 +434,10 @@ const TYPE_PROFILES = {
   <!-- VII. 시세 (실거래가) -->
   <section>
     <div class="sec-label">VII. Transaction Prices</div>
-    <div class="sec-title">상가 시세 — 실거래가 기준</div>
-    <div class="sec-lead">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
+    <div class="sec-title direct-tone">상가 시세 — 실거래가 기준</div>
+    <div class="sec-title franchise-tone">상권 시세 · 임대 전망</div>
+    <div class="sec-lead direct-tone">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
+    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — 인근 <b>실거래·거래량</b>으로 공실 대비 임대 전망과 상권 사업성을 참고합니다. 본사 손익 모델과는 별도로 해석합니다.</div>
     <div class="grid" style="margin-bottom:16px;" id="priceGrid"></div>
     <table class="tbl">
       <thead><tr><th>거래시점</th><th>소재</th><th class="num">전용(평)</th><th class="num">거래금액</th><th class="num">평당가</th></tr></thead>
@@ -1105,6 +1118,55 @@ function scoreEconomicsV2(price, max, buildingType, trafficMetrics) {
   return result;
 }
 
+function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, demand, competition) {
+  const cfg = CONFIG.SCORING?.FRANCHISE || {};
+  const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
+  const vitality = trafficMetrics?.marketVitality || 0;
+  const foot = trafficMetrics?.footTrafficProxy || 0;
+  const hnb2 = trafficMetrics?.hnb2km || 0;
+  const deals = price?.deals12mo || 0;
+  const rent = price?.rentPerPy;
+  const sale = price?.salePerPy || 0;
+  const hh = smoothRatio(toNumber(demand?.households5km), CONFIG.SCORING?.DEMAND?.REGION_HOUSEHOLD_FULL || 120000);
+
+  let marketActivity;
+  if (deals >= (cfg.MARKET_DEALS_HIGH || 6)) marketActivity = 0.9;
+  else if (deals >= (cfg.MARKET_DEALS_MID || 3)) marketActivity = 0.76;
+  else if (deals >= 1) marketActivity = 0.58;
+  else marketActivity = 0.4;
+
+  let leasingBand = 0.52;
+  if (rent != null && rent > 0) {
+    const r = rent / benchmark;
+    const sweetMin = cfg.LEASING_SWEET_MIN || 0.65;
+    const sweetMax = cfg.LEASING_SWEET_MAX || 1.35;
+    if (r >= sweetMin && r <= sweetMax) leasingBand = 0.84;
+    else if (r < sweetMin) leasingBand = 0.68;
+    else if (r <= 1.85) leasingBand = 0.6;
+    else leasingBand = foot >= 0.32 ? 0.58 : 0.44;
+  } else if (sale > 0 && deals > 0) {
+    leasingBand = 0.64;
+  }
+
+  if (rent != null && rent > benchmark * 1.35 && foot >= 0.34) leasingBand += 0.08;
+
+  const c2 = competition?.["2km"] || competition?.["1km"] || {};
+  const wh2 = c2.warehouse || 0;
+  const compGap = wh2 === 0 ? 0.07 : wh2 === 1 ? 0.02 : -0.05;
+
+  const bizViability = clamp01(
+    vitality * 0.32 + foot * 0.26 + hh * 0.1
+    + (hnb2 >= 3 && hnb2 <= 18 ? 0.12 : hnb2 >= 1 ? 0.04 : 0)
+    + scoreHospitalDemandBoost(trafficMetrics) * 2
+    + (detectHNBColocationStrategy(trafficMetrics) ? 0.1 : 0)
+  );
+
+  const composite = clamp01(
+    marketActivity * 0.26 + leasingBand * 0.24 + bizViability * 0.4 + compGap + 0.06
+  );
+  return Math.round(composite * max);
+}
+
 function scorePhysicalV2(building, max, trafficMetrics) {
   const cfg = CONFIG.SCORING?.PHYSICAL || {};
   const ideal = cfg.AREA_IDEAL_PY || 200;
@@ -1194,7 +1256,7 @@ function collectScoreBlockers(data) {
   const metrics = data.traffic?.metrics || {};
   metrics.hnb2km = metrics.hnb2km || data.competition?.["2km"]?.hnb || 0;
   if (!hasParking(b) && !detectHNBColocationStrategy(metrics)) blockers.push("no_parking");
-  if (rent != null && rent > benchmark * 2) blockers.push("rent_high");
+  if (!isFranchiseStoreModel() && rent != null && rent > benchmark * 2) blockers.push("rent_high");
   if (toNumber(b.areaPy) > 0 && toNumber(b.areaPy) < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
     blockers.push("area_small");
   }
@@ -1268,7 +1330,9 @@ function computeFullScore(data) {
     demand: scoreDemandV2(data.demand, W.demand, prof.factor, data.traffic?.metrics),
     traffic: scoreTrafficV2(data.traffic, data.landmarks, W.traffic, data.traffic?.metrics),
     competition: scoreCompetitionV2(data.competition, W.competition, marketContext),
-    economics: scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics),
+    economics: isFranchiseStoreModel()
+      ? scoreFranchiseViabilityV2(data.price, W.economics, b.type, data.traffic?.metrics, data.demand, data.competition)
+      : scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics),
     physical: scorePhysicalV2(b, W.physical, data.traffic?.metrics)
   };
 
@@ -1310,7 +1374,8 @@ function computeFullScore(data) {
     marketVitality: vitality,
     isPremiumHub,
     pharmacyOversaturated: detectPharmacyOversaturation(data.competition, compCfg),
-    districtZone: data.traffic?.metrics?.districtZone || "general"
+    districtZone: data.traffic?.metrics?.districtZone || "general",
+    storeModel: isFranchiseStoreModel() ? "franchise" : "direct"
   };
 }
 
@@ -1341,6 +1406,53 @@ let progressState = {};
 
 function isExternalMode() {
   return document.body.classList.contains("external");
+}
+
+const STORE_MODEL_KEY = "ps_store_model";
+
+function isFranchiseStoreModel() {
+  return document.body.classList.contains("store-franchise");
+}
+
+function getStoreModelLabel() {
+  return isFranchiseStoreModel() ? "가맹(건물주 보유)" : "직영";
+}
+
+function applyStoreModel(model) {
+  const franchise = model === "franchise";
+  document.body.classList.toggle("store-franchise", franchise);
+  $("storeDirect")?.classList.toggle("on", !franchise);
+  $("storeFranchise")?.classList.toggle("on", franchise);
+  try {
+    sessionStorage.setItem(STORE_MODEL_KEY, franchise ? "franchise" : "direct");
+  } catch { /* ignore */ }
+}
+
+function initStoreModel() {
+  let saved = "direct";
+  try {
+    saved = sessionStorage.getItem(STORE_MODEL_KEY) || "direct";
+  } catch { /* ignore */ }
+  applyStoreModel(saved === "franchise" ? "franchise" : "direct");
+}
+
+function getScoreAxisLabels() {
+  if (isFranchiseStoreModel()) {
+    return {
+      demand: "배후 수요",
+      traffic: "유동·집객력",
+      competition: "경쟁 환경",
+      economics: "사업성·임대 전망",
+      physical: "물리 조건"
+    };
+  }
+  return {
+    demand: "배후 수요",
+    traffic: "유동·집객력",
+    competition: "경쟁 환경",
+    economics: "시세 대비 수익성",
+    physical: "물리 조건"
+  };
 }
 
 function escapeHtml(text) {
@@ -1437,9 +1549,12 @@ function buildInternalMemo(scoreResult, d) {
   const b = d.building || {};
   const rows = [
     ["종합 판단", `${total}점 / ${grade}등급 — ${blockers.length ? "리스크 상한 적용" : "상한 없음"}`],
-    ["축별 점수", `수요 ${sc.demand} · 유동 ${sc.traffic} · 경쟁 ${sc.competition} · 경제성 ${sc.economics} · 물리 ${sc.physical}`],
+    ["출점 기준", getStoreModelLabel(), isFranchiseStoreModel() ? "건물주 보유 — 사업성·임대 전망 축" : "본사 직영 — 손익·임대 기준"],
+    ["축별 점수", `수요 ${sc.demand} · 유동 ${sc.traffic} · 경쟁 ${sc.competition} · ${isFranchiseStoreModel() ? "사업성" : "경제성"} ${sc.economics} · 물리 ${sc.physical}`],
     ["데이터 신뢰도", `${confidence}% — ${confidence < 50 ? "판단 보류 권고" : confidence < 75 ? "보수적 해석" : "판단 가능"}`],
-    ["임대 협상 포인트", rent == null ? "실거래 부족 — 임대료 협상 전제 불명확" : rent <= CONFIG.BENCHMARK_RENT_PER_PY ? `평당 ${rent}만원 — 기준 이내, 협상 여지 있음` : `평당 ${rent}만원 — 기준 상회, 임대료 하향 없으면 보류`],
+    ["임대·시세", isFranchiseStoreModel()
+      ? (rent == null ? `실거래 ${d.price?.deals12mo || 0}건 — 공실·시세 현장 확인` : `인근 시세 ${rent}만원/평 · 거래 ${d.price?.deals12mo || 0}건`)
+      : (rent == null ? "실거래 부족 — 임대료 협상 전제 불명확" : rent <= CONFIG.BENCHMARK_RENT_PER_PY ? `평당 ${rent}만원 — 기준 이내` : `평당 ${rent}만원 — 기준 상회, 협상 필요`)],
     ["창고형 경쟁", c1.warehouse > 0 ? `1km 내 ${c1.warehouse}개소 — 직접 경쟁, 출점 재검토` : `1km 내 미탐지 · 2km ${c2.warehouse || 0}개소`],
     ["상권 활성도", (() => {
       const v = d.traffic?.metrics?.marketVitality;
@@ -1488,9 +1603,13 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
       hubNote +
       `배후 주거는 약 <b>${fmt(dm.households5km)}세대</b>이며, 반경 5km 내 약국 <b>${c5.pharmacies}</b>개소, 창고형 약국 <b>${c5.warehouse}</b>개소가 확인되었습니다. ` +
       `${hasParking(b) ? `주차 여건(<b>${parkingLabel}</b>)이 확보되어 있습니다. ` : hnbColocation ? `본 입지는 <b>H&B 동선 상권</b>으로 보행·집객을 우선 반영했습니다. ` : ""}` +
-      (rentPerPy == null
-        ? `인근 실거래가 기준 임대료 추정이 어려워, 경제성은 현장 임대 조건 확인이 필요합니다. `
-        : `평당 임대료는 약 <b>${rentPerPy}만원</b>으로 추정되며, 본사 표준 손익 모델 대비 ${rentOk ? "적정 수준" : "다소 높은 편"}으로 분석됩니다. `) +
+      (isFranchiseStoreModel()
+        ? (rentPerPy == null
+          ? `인근 실거래가 제한적이어서 임대 전망은 현장 공실·시세 확인이 필요합니다. `
+          : `건물주 보유 상가 기준으로 인근 시세(평당 약 <b>${rentPerPy}만원</b>)와 상권 사업성을 함께 검토했습니다. `)
+        : (rentPerPy == null
+          ? `인근 실거래가 기준 임대료 추정이 어려워, 경제성은 현장 임대 조건 확인이 필요합니다. `
+          : `평당 임대료는 약 <b>${rentPerPy}만원</b>으로 추정되며, 본사 표준 손익 모델 대비 ${rentOk ? "적정 수준" : "다소 높은 편"}으로 분석됩니다. `)) +
       `${warns.length ? `다만 <b>${warnTexts}</b> 등은 추가 검토가 필요합니다(III장 참조). ` : ""}` +
       `종합적으로 <b>${total}점(${grade}등급)</b>으로 평가되었으며, 최종 출점 여부는 현장 실사와 임대 협상 결과를 함께 검토해 주시기 바랍니다.`
     );
@@ -1500,7 +1619,9 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
     `[내부 검토] ${dm.note} · ${b.type} · ${total}점(${grade}). ` +
     `1km 창고형 ${c1.warehouse} · 2km ${c2.warehouse} · 5km 약국 ${c5.pharmacies}. ` +
     `${b.floor}·${parkingLabel}·면적 ${b.areaPy || "미확인"}평. ` +
-    (rentPerPy == null ? `임대료 추정 불가 — 경제성 점수 보수 적용. ` : `임대 ${rentPerPy}만원/평 — ${rentOk ? "기준 이내" : "기준 초과"}. `) +
+    (rentPerPy == null
+      ? (isFranchiseStoreModel() ? `임대 시세 추정 불가 — 사업성·임대 전망 보수 적용. ` : `임대료 추정 불가 — 경제성 점수 보수 적용. `)
+      : (isFranchiseStoreModel() ? `인근 시세 ${rentPerPy}만원/평 — 사업성·임대 전망 축 반영. ` : `임대 ${rentPerPy}만원/평 — ${rentOk ? "기준 이내" : "기준 초과"}. `)) +
     `${warns.length ? `리스크: ${warnTexts}. ` : ""}` +
     `${grade === "D" || grade === "C" ? "출점 비권장 또는 보류 검토." : grade === "B" ? "조건부 진행 — 협상 전제." : "진행 검토 가능."}`
   );
@@ -1512,6 +1633,7 @@ function render(){
   const today = new Date();
   const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,"0")}.${String(today.getDate()).padStart(2,"0")}`;
   $("mAddr").textContent = d.address;
+  $("mStoreModel").textContent = getStoreModelLabel();
   $("mDate").textContent = dateStr;
   $("ftrDate").textContent = dateStr + " 작성";
 
@@ -1559,7 +1681,7 @@ function render(){
     $("blockerNote").style.display = "none";
   }
 
-  const names = { demand:"배후 수요", traffic:"유동·집객력", competition:"경쟁 환경", economics:"시세 대비 수익성", physical:"물리 조건" };
+  const names = getScoreAxisLabels();
   $("scoreBars").innerHTML = Object.keys(sc).map(k=>{
     const pct = Math.round(sc[k]/W[k]*100);
     return `<div class="bar-row">
@@ -1588,6 +1710,8 @@ function render(){
   const districtZone = scoreResult.districtZone || d.traffic?.metrics?.districtZone || "general";
   const vitalityPct = scoreResult.marketVitality != null ? Math.round(scoreResult.marketVitality * 100) : null;
   const hnbColocation = detectHNBColocationStrategy({ ...(d.traffic?.metrics || {}), hnb2km: c2.hnb });
+  const franchiseMode = isFranchiseStoreModel();
+  const p = d.price;
   const fits = [
     [c2.warehouse === 0 ? "ok" : (c1.warehouse === 0 ? "cond" : "no"),
      "창고형 약국·유사 업태",
@@ -1631,13 +1755,21 @@ function render(){
      dm.households5km >= householdThreshold
        ? `기준 규모(${fmt(householdThreshold)}세대) 이상입니다.`
        : `기준 규모 미만 — 광역 차량 유입 의존도가 높아질 수 있습니다.`],
-    [rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no")),
-     rentPerPy == null
-       ? "임대료 수준 — 추정 불가"
-       : `임대료 수준 — 평당 ${rentPerPy}만원/월`,
-     rentGapPct == null
-       ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
-       : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`]
+    [franchiseMode
+        ? (p.deals12mo >= 3 && vitalityPct >= 40 ? "ok" : (p.deals12mo >= 1 || vitalityPct >= 35 ? "cond" : "no"))
+        : (rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no"))),
+     franchiseMode
+       ? `상권·임대 전망 — 최근 거래 ${p.deals12mo}건`
+       : (rentPerPy == null ? "임대료 수준 — 추정 불가" : `임대료 수준 — 평당 ${rentPerPy}만원/월`),
+     franchiseMode
+       ? (p.deals12mo >= 3
+          ? `인근 상업 실거래 ${p.deals12mo}건 — 시세 참고 가능. 상권 활성도 ${vitalityPct ?? "—"}점·H&B·병원 시너지로 사업성·임대 전망을 평가했습니다.`
+          : p.deals12mo >= 1
+            ? `실거래 ${p.deals12mo}건 — 시세 참고는 제한적입니다. 공실·호가는 현장 확인이 필요합니다.`
+            : "인근 실거래 부족 — 공실·임대 전망은 현장 조사 전제입니다.")
+       : (rentGapPct == null
+          ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
+          : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`)],
   ];
   const marks = { ok:"●", cond:"◐", no:"○" };
   const fitRow = f => `<div class="fit"><div class="fit-mark ${f[0]}">${marks[f[0]]}</div>
@@ -1700,11 +1832,10 @@ function render(){
   renderCompetition(currentRadius);
 
   /* VII. 시세 */
-  const p = d.price;
   $("priceGrid").innerHTML = [
     ["평당 매매 실거래가", p.salePerPy > 0 ? fmt(p.salePerPy)+"만원" : "확인 필요", `반경 ${tradeKm}km 내 최근 12개월 평균`, true],
-    ["평당 임대료(월)", p.rentPerPy == null ? "추정 불가" : `${p.rentPerPy}만원`, p.rentSource || "매매 실거래 기반 추정", false],
-    ["최근 12개월 거래", p.deals12mo+"건", `반경 ${tradeKm}km 내 참고`, false]
+    [franchiseMode ? "인근 임대 시세(추정)" : "평당 임대료(월)", p.rentPerPy == null ? "추정 불가" : `${p.rentPerPy}만원`, franchiseMode ? "공실 대비 임대 전망 참고" : (p.rentSource || "매매 실거래 기반 추정"), false],
+    ["최근 12개월 거래", p.deals12mo+"건", franchiseMode ? `반경 ${tradeKm}km — 거래량이 많을수록 시세·공실 판단에 유리` : `반경 ${tradeKm}km 내 참고`, false]
   ].map(m=>`<div class="metric ${m[3]?"hl":""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   $("dealRows").innerHTML = p.deals.length
     ? p.deals.map(r =>
@@ -3466,6 +3597,15 @@ $("modeExternal").addEventListener("click", ()=>{
   $("modeExternal").classList.add("on"); $("modeInternal").classList.remove("on");
   if (DATA.address && DATA.address !== "—") render();
 });
+$("storeDirect").addEventListener("click", ()=>{
+  applyStoreModel("direct");
+  if (DATA.address && DATA.address !== "—") render();
+});
+$("storeFranchise").addEventListener("click", ()=>{
+  applyStoreModel("franchise");
+  if (DATA.address && DATA.address !== "—") render();
+});
+initStoreModel();
 if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
 renderRecentSearches();
 
