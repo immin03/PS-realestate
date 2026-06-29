@@ -2718,6 +2718,8 @@ async function runPublicDataAnalysis(kakaoResult) {
   render();
   setStepProgress("finish", 100);
   saveRecentSearch(addr);
+
+  if (errors.length) {
     alert(`분석은 완료했으나 일부 API 오류가 있습니다.\n\n${errors.slice(0, 5).join("\n")}${errors.length > 5 ? `\n…외 ${errors.length - 5}건` : ""}`);
   }
 }
