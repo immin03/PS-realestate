@@ -401,12 +401,12 @@ const TYPE_PROFILES = {
   <section>
     <div class="sec-label">VI. Competitive Landscape</div>
     <div class="sec-title">경쟁 환경</div>
-    <div class="sec-lead">반경 내 약국 · 창고형 약국 분포를 중심으로 평가합니다. <b>성수·명동·강남</b> 등 프리미엄 상권은 대형 리테일·약국 밀집이 유동·집객을 끌어주는 <b>상권 활성 신호</b>로 해석하며, 창고형 약국 1km 인접만 직접 경쟁으로 강하게 반영합니다.</div>
+    <div class="sec-lead">반경 내 약국 · 창고형 약국 · H&amp;B(뷰티) 분포를 평가합니다. <b>명동·강남 중심</b>과 <b>가로수길·신사</b> 등은 유동·관광 POI 데이터로 활성도를 구분하며, H&amp;B는 제품 포트폴리오(뷰티 약 30%) 관점에서 수요·경쟁을 함께 반영합니다.</div>
     <div class="map-head">
       <div class="legend">
         <span><span class="dot" style="background:var(--teal)"></span>약국 <b id="cntPh">—</b></span>
         <span><span class="dot" style="background:var(--red)"></span>창고형 약국 <b id="cntWh">—</b></span>
-        <span><span class="dot" style="background:var(--amber)"></span>H&amp;B(참고) <b id="cntHb">—</b></span>
+        <span><span class="dot" style="background:var(--amber)"></span>H&amp;B·뷰티 <b id="cntHb">—</b></span>
       </div>
       <div class="radius-toggle" id="radiusToggle"></div>
     </div>
@@ -583,78 +583,140 @@ function computeDataConfidence(quality) {
   return Math.round((sum / max) * 100);
 }
 
+function classifyAddressZone(address = "") {
+  const addr = String(address || "");
+  const mega = (CONFIG.SCORING?.MEGA_HUB_KEYWORDS || []).some(k => addr.includes(k));
+  const soft = (CONFIG.SCORING?.SOFT_CORRIDOR_KEYWORDS || []).some(k => addr.includes(k));
+  const premium = (CONFIG.SCORING?.PREMIUM_DISTRICT_KEYWORDS || []).some(k => addr.includes(k));
+  if (mega) return "mega_hub";
+  if (soft && !mega && !/강남대로|강남역/.test(addr)) return "soft_corridor";
+  if (premium) return "premium";
+  return "general";
+}
+
+function districtZoneLabel(zone) {
+  const labels = {
+    mega_hub: "메가 허브 (명동·강남 중심 등)",
+    premium: "프리미엄 상권",
+    soft_corridor: "보조 상권 (가로수길·신사 등)",
+    general: "일반 상권"
+  };
+  return labels[zone] || labels.general;
+}
+
 function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
   const landmarkCount = metrics?.landmarkCount ?? landmarks?.length ?? 0;
   const tourismPoi = metrics?.tourismPoiCount || 0;
-  const subwayNear = metrics?.subwayDistM != null && Number(metrics.subwayDistM) <= 700;
+  const subwayDist = metrics?.subwayDistM;
+  const subwayNear = subwayDist != null && Number(subwayDist) <= 500;
+  const subwayWalk = subwayDist != null && Number(subwayDist) <= 900;
   const deptCount = metrics?.deptCount || 0;
   const anchorCount = traffic?.anchors?.length || 0;
-  const addrHint = /신사|강남|홍대|명동|이태원|종로|한남|압구정|청담|가로수|관광|역삼|을지로|동대문|성수|삼성|잠실|여의도|선릉|논현|건대|왕십리|광화문|서울역|코엑스/.test(String(address || ""));
+  const subwayCount = metrics?.subwayCount || 0;
+  const population = Number(metrics?.population5km) || 0;
+  const zone = classifyAddressZone(address);
 
   let s = 0;
-  if (tourismPoi >= 1) s += 0.14;
-  if (tourismPoi >= 3) s += 0.18;
-  if (tourismPoi >= 6) s += 0.14;
-  if (landmarkCount >= 2) s += 0.1;
-  if (landmarkCount >= 4) s += 0.1;
-  if (subwayNear) s += 0.14;
-  if (deptCount > 0) s += 0.08;
-  if (anchorCount >= 3) s += 0.08;
-  if (addrHint && (subwayNear || landmarkCount >= 1 || tourismPoi >= 1)) s += 0.12;
+  if (subwayNear) s += 0.24;
+  else if (subwayWalk) s += 0.15;
+  else if (subwayDist != null && Number(subwayDist) <= 1500) s += 0.06;
+  if (subwayCount >= 3) s += 0.06;
+
+  if (tourismPoi >= 1) s += 0.1;
+  if (tourismPoi >= 4) s += 0.14;
+  if (tourismPoi >= 8) s += 0.1;
+  if (landmarkCount >= 2) s += 0.08;
+  if (landmarkCount >= 4) s += 0.06;
+  if (deptCount > 0) s += 0.11;
+  if (anchorCount >= 4) s += 0.05;
+  if (population >= 200000) s += 0.07;
+  else if (population >= 100000) s += 0.04;
+
+  if (zone === "mega_hub" && s >= 0.28) s += 0.07;
+
   return clamp01(s);
 }
 
-function inferBizType({ subwayCount, martCount, landmarkCount, tourismPoiCount, footTrafficProxy, address }) {
-  const addr = String(address || "");
-  const tourismHint = /신사|강남|홍대|명동|이태원|종로|한남|압구정|청담|가로수|역삼|성수|삼성|잠실|을지로|동대문/.test(addr);
+function inferBizType({ subwayCount, martCount, landmarkCount, tourismPoiCount, footTrafficProxy, address, districtZone }) {
+  const zone = districtZone || classifyAddressZone(address);
+  const foot = footTrafficProxy || 0;
 
-  if (footTrafficProxy >= 0.5 || tourismPoiCount >= 3 || (landmarkCount >= 3 && subwayCount)) {
+  if (zone === "mega_hub" && foot >= 0.45) return "메가 허브·관광 유동 상권";
+  if (foot >= 0.52 || tourismPoiCount >= 4 || (landmarkCount >= 3 && subwayCount)) {
     return "관광·유동 복합 상권";
   }
-  if (footTrafficProxy >= 0.42 && landmarkCount >= 2) {
-    return "프리미엄 리테일·유동 상권";
+  if (zone === "soft_corridor") {
+    return foot >= 0.42 ? "프리미엄 리테일·보조 유동 상권" : "리테일·보행 상권 (유동 둔화 주의)";
   }
-  if (tourismHint && subwayCount) return "관광·유동 복합 상권";
+  if (foot >= 0.4 && landmarkCount >= 2) return "프리미엄 리테일·유동 상권";
   if (subwayCount) return "대중교통·생활상권 복합권";
   if (martCount) return "주거 배후·마트 연계 상권";
   return "지역 상권";
 }
 
 function premiumDistrictHint(address = "") {
-  const addr = String(address || "");
-  const keywords = CONFIG.SCORING?.PREMIUM_DISTRICT_KEYWORDS || [];
-  return keywords.some(k => addr.includes(k));
+  const zone = classifyAddressZone(address);
+  return zone === "mega_hub" || zone === "premium";
 }
 
-function computeMarketVitality({ address, metrics, traffic, competition }) {
+function computeMarketVitality({ address, metrics, traffic, competition, demand }) {
   const m = metrics || {};
   const c2 = competition?.["2km"] || competition?.["1km"] || {};
-  const districtHint = premiumDistrictHint(address);
+  const zone = m.districtZone || classifyAddressZone(address);
   const foot = m.footTrafficProxy || 0;
   const landmarks = m.landmarkCount || 0;
   const tourism = m.tourismPoiCount || 0;
   const dept = m.deptCount || 0;
   const subwayNear = m.subwayDistM != null && Number(m.subwayDistM) <= 650;
-  const hnb2 = c2.hnb || 0;
   const ph2 = c2.pharmacies || 0;
-  const anchors = traffic?.anchors?.length || 0;
-  const bizHub = /관광|복합|리테일|대중교통/.test(traffic?.bizType || "");
+  const compCfg = CONFIG.SCORING?.COMPETITION || {};
 
-  let v = 0;
-  if (districtHint) v += 0.2;
-  if (foot >= 0.3) v += foot * 0.34;
-  if (landmarks >= 2) v += 0.09;
-  if (landmarks >= 4) v += 0.07;
-  if (tourism >= 2) v += 0.08;
+  let v = foot * 0.58;
+  if (tourism >= 3) v += 0.1;
+  if (tourism >= 6) v += 0.06;
   if (dept > 0) v += 0.07;
-  if (subwayNear) v += 0.11;
-  if (hnb2 >= 5) v += 0.07;
-  if (hnb2 >= 10) v += 0.06;
-  if (anchors >= 4) v += 0.06;
-  if (ph2 >= 6 && ph2 <= 45) v += 0.05;
-  if (bizHub) v += 0.05;
+  if (subwayNear) v += 0.09;
+  if (landmarks >= 3) v += 0.05;
+  if (ph2 >= 10 && ph2 <= 45) v += 0.04;
+
+  if (zone === "mega_hub" && foot >= 0.32) v += 0.12;
+  else if (zone === "premium" && foot >= 0.38) v += 0.06;
+  else if (zone === "soft_corridor") {
+    const cap = foot >= 0.52 && tourism >= 5
+      ? (compCfg.SOFT_CORRIDOR_VITALITY_CAP || 0.46)
+      : (compCfg.SOFT_CORRIDOR_STRICT_CAP || 0.4);
+    v = Math.min(v, cap);
+  }
 
   return clamp01(v);
+}
+
+function scoreHNBBeauty(hnb1, hnb2, vitality, compCfg) {
+  let s = 0;
+  const sweetMin = compCfg.HNB_BEAUTY_SWEET_MIN || 4;
+  const sweetMax = compCfg.HNB_BEAUTY_SWEET_MAX || 18;
+  const compStart = compCfg.HNB_BEAUTY_COMP_START || 20;
+  const beautyWeight = compCfg.BEAUTY_PRODUCT_SHARE || 0.3;
+
+  if (hnb2 >= sweetMin && hnb2 <= sweetMax) {
+    s += (compCfg.HNB_BEAUTY_DEMAND_BONUS || 0.055) * (0.7 + beautyWeight);
+  } else if (hnb2 >= 2 && hnb2 < sweetMin) {
+    s += 0.025;
+  }
+
+  if (hnb1 >= 6 && hnb1 <= 14) s -= 0.03 * (0.6 + beautyWeight);
+  else if (hnb1 >= 15) s -= Math.min(0.075, 0.03 + (hnb1 - 14) * 0.004 * (0.5 + beautyWeight));
+
+  if (hnb2 >= compStart) {
+    s -= Math.min(
+      compCfg.HNB_BEAUTY_COMP_CAP || 0.09,
+      (hnb2 - compStart) * (compCfg.HNB_BEAUTY_COMP_PER || 0.005) * (0.8 + beautyWeight)
+    );
+  }
+
+  if (vitality >= 0.4 && hnb2 >= 5 && hnb2 < compStart) s += 0.025;
+
+  return s;
 }
 
 function scorePharmacyDensity(ph1, ph2, vitality, compCfg) {
@@ -698,24 +760,13 @@ function scoreCompetitionV2(competition, max, marketContext) {
   const ph2 = c2.pharmacies || 0;
   s += scorePharmacyDensity(ph1, ph2, vitality, compCfg);
 
+  const hnb1 = c1.hnb || 0;
   const hnb2 = c2.hnb || 0;
-  const retailMin = compCfg.RETAIL_ECOSYSTEM_HNB_MIN || 5;
-  const retailBonus = compCfg.RETAIL_ECOSYSTEM_BONUS || 0.07;
+  s += scoreHNBBeauty(hnb1, hnb2, vitality, compCfg);
 
   if (isHub) {
-    if (hnb2 >= retailMin) s += retailBonus;
-    if (hnb2 >= retailMin + 6) s += retailBonus * 0.55;
     const metrics = marketContext?.metrics || {};
-    if ((metrics.landmarkCount || 0) >= 3 || (metrics.deptCount || 0) > 0) s += 0.05;
-  } else {
-    const hnbHigh = compCfg.HNB_HIGH_THRESHOLD || 18;
-    const hnbOver = Math.max(0, hnb2 - hnbHigh);
-    if (hnbOver > 0) {
-      s -= Math.min(
-        compCfg.HNB_PENALTY_CAP || 0.05,
-        hnbOver * (compCfg.HNB_PENALTY_PER_STORE || 0.003)
-      );
-    }
+    if ((metrics.landmarkCount || 0) >= 3 || (metrics.deptCount || 0) > 0) s += 0.04;
   }
 
   if ((c2.warehouse || 0) === 0 && (c5.warehouse || 0) <= 1) s += 0.05;
@@ -742,16 +793,19 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
   const subwayBoost = distanceScore(trafficMetrics?.subwayDistM, 400, 1200, 3000) * 0.12;
   const foot = trafficMetrics?.footTrafficProxy || 0;
   const vitality = trafficMetrics?.marketVitality || 0;
+  const hnb2 = trafficMetrics?.hnb2km || 0;
   const footBlend = CONFIG.SCORING?.TRAFFIC?.FOOT_TRAFFIC_DEMAND_BLEND || 0.38;
+  const beautyShare = CONFIG.SCORING?.COMPETITION?.BEAUTY_PRODUCT_SHARE || 0.3;
+  const beautyDemand = hnb2 >= 4 && hnb2 <= 18 ? beautyShare * 0.14 : hnb2 >= 2 ? beautyShare * 0.05 : 0;
 
   let composite;
   if (foot >= 0.4 || vitality >= 0.42) {
     const hubBlend = Math.max(foot, vitality * 0.85);
     composite = clamp01(
-      hh * 0.2 + age * 0.16 + apt * 0.08 + hubBlend * footBlend + subwayBoost + 0.14
+      hh * 0.2 + age * 0.16 + apt * 0.08 + hubBlend * footBlend + beautyDemand + subwayBoost + 0.12
     );
   } else {
-    composite = clamp01(hh * 0.42 + age * 0.28 + apt * 0.22 + subwayBoost + 0.08);
+    composite = clamp01(hh * 0.4 + age * 0.27 + apt * 0.21 + beautyDemand + subwayBoost + 0.08);
   }
 
   return Math.round(composite * typeFactor * max);
@@ -912,13 +966,40 @@ function computeFullScore(data) {
   const vetoCfg = CONFIG.SCORING?.VETO || {};
   const compCfg = CONFIG.SCORING?.COMPETITION || {};
 
+  if (data.traffic?.metrics) {
+    const m = data.traffic.metrics;
+    m.districtZone = classifyAddressZone(data.address);
+    m.districtZoneLabel = districtZoneLabel(m.districtZone);
+    m.hnb1km = data.competition?.["1km"]?.hnb || 0;
+    m.hnb2km = data.competition?.["2km"]?.hnb || 0;
+    m.population5km = data.demand?.population5km || 0;
+    m.footTrafficProxy = computeFootTrafficProxy(
+      data.traffic,
+      data.landmarks,
+      m,
+      data.address
+    );
+  }
+
   const vitality = computeMarketVitality({
     address: data.address,
     metrics: data.traffic?.metrics,
     traffic: data.traffic,
-    competition: data.competition
+    competition: data.competition,
+    demand: data.demand
   });
-  if (data.traffic?.metrics) data.traffic.metrics.marketVitality = vitality;
+  if (data.traffic?.metrics) {
+    data.traffic.metrics.marketVitality = vitality;
+    data.traffic.bizType = inferBizType({
+      subwayCount: (data.traffic.metrics.subwayCount || 0) > 0,
+      martCount: (data.traffic.metrics.martCount || 0) > 0,
+      landmarkCount: data.traffic.metrics.landmarkCount || 0,
+      tourismPoiCount: data.traffic.metrics.tourismPoiCount || 0,
+      footTrafficProxy: data.traffic.metrics.footTrafficProxy,
+      address: data.address,
+      districtZone: data.traffic.metrics.districtZone
+    });
+  }
 
   const marketContext = {
     vitality,
@@ -961,7 +1042,8 @@ function computeFullScore(data) {
     blockers: vetoed.blockers,
     confidence,
     marketVitality: vitality,
-    isPremiumHub: vitality >= hubMin
+    isPremiumHub: vitality >= hubMin,
+    districtZone: data.traffic?.metrics?.districtZone || "general"
   };
 }
 
@@ -1096,7 +1178,8 @@ function buildInternalMemo(scoreResult, d) {
       const v = d.traffic?.metrics?.marketVitality;
       if (v == null) return "데이터 미연동";
       const pct = Math.round(v * 100);
-      return `${pct}점${pct >= 40 ? " — 프리미엄·리테일 상권 보정 적용" : ""}`;
+      const zone = d.traffic?.metrics?.districtZoneLabel || "";
+      return `${pct}점${zone ? ` · ${zone}` : ""}`;
     })()],
     ["물리 조건", `${b.floor || "층수 미확인"} · ${b.parking || "주차 미확인"} · ${b.areaPy ? b.areaPy + "평" : "면적 확인 필요"}`],
     ["계약 구조", "상표 사용·운영 협력 계약(수수료) + 컨설팅 계약"],
@@ -1118,7 +1201,9 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
 
   const footProxy = d.traffic?.metrics?.footTrafficProxy || 0;
   const hubNote = scoreResult.isPremiumHub
-    ? `본 입지는 <b>프리미엄 리테일·유동 상권</b>(활성도 ${Math.round((scoreResult.marketVitality || 0) * 100)}점)으로, 대형 리테일·약국 밀집은 유동·집객을 끌어주는 상권 특성으로 반영했습니다. `
+    ? scoreResult.districtZone === "soft_corridor"
+      ? `본 입지는 <b>${d.traffic?.metrics?.districtZoneLabel || "보조 상권"}</b>(활성도 ${Math.round((scoreResult.marketVitality || 0) * 100)}점)으로, 가로수길·신사 일대는 명동·강남 중심과 달리 <b>유동·관광 POI 데이터</b>를 우선 반영했습니다. `
+      : `본 입지는 <b>${d.traffic?.metrics?.districtZoneLabel || "프리미엄 상권"}</b>(활성도 ${Math.round((scoreResult.marketVitality || 0) * 100)}점)으로, 대형 리테일·약국 밀집은 유동·집객을 끌어주는 상권 특성으로 반영했습니다. `
     : footProxy >= 0.4
       ? `관광·유동 상권으로 분류되어(<b>${d.traffic?.bizType || "복합 상권"}</b>) 배후 세대뿐 아니라 유동 인구를 수요 점수에 반영했습니다. `
       : "";
@@ -1226,6 +1311,7 @@ function render(){
     : Math.round((rentPerPy / CONFIG.BENCHMARK_RENT_PER_PY - 1) * 100);
   const whNames = (c5.warehouseStores || []).slice(0, 3).map(s => s.place_name).join(", ");
   const isPremiumHub = scoreResult.isPremiumHub;
+  const districtZone = scoreResult.districtZone || d.traffic?.metrics?.districtZone || "general";
   const vitalityPct = scoreResult.marketVitality != null ? Math.round(scoreResult.marketVitality * 100) : null;
   const fits = [
     [c2.warehouse === 0 ? "ok" : (c1.warehouse === 0 ? "cond" : "no"),
@@ -1240,17 +1326,19 @@ function render(){
         : (c5.pharmacies <= 50 ? "ok" : "cond"),
      `약국 분포 — 반경 5km 내 ${c5.pharmacies}개소 (1km ${c1.pharmacies}개소)`,
      isPremiumHub
-       ? `프리미엄 상권(활성도 ${vitalityPct}점) — 약국·리테일 밀집은 유동 상권이 작동 중이라는 신호로 해석합니다. 창고형 1km 인접 여부가 더 중요합니다.`
+       ? districtZone === "soft_corridor"
+         ? `보조 상권(활성도 ${vitalityPct}점) — 약국·리테일 밀집이 있으나 명동·강남 중심 대비 유동 데이터상 활성도는 제한적으로 반영됩니다.`
+         : `프리미엄 상권(활성도 ${vitalityPct}점) — 약국·리테일 밀집은 유동 상권이 작동 중이라는 신호로 해석합니다.`
        : c5.pharmacies <= 50
          ? "광역 기준 과밀 수준은 아닙니다."
          : "광역 밀집도가 높습니다. 규모·구색 차별화가 전제되어야 합니다."],
     [isPremiumHub ? "ok" : (c2.hnb <= 12 ? "ok" : "cond"),
-     `H&B·리테일 — 2km 내 ${c2.hnb}개소`,
+     `H&B·뷰티 — 2km 내 ${c2.hnb}개소 (1km ${c1.hnb}개소)`,
      isPremiumHub
-       ? `대형 리테일·H&B 밀집은 집객·유동 인프라입니다. 건강·약업 직접 경쟁이 아니며, 경쟁 점수에서는 상권 활성 가산으로 반영됩니다.`
+       ? `제품 포트폴리오의 약 30%가 뷰티 카테고리입니다. H&B 밀집은 뷰티 수요·경쟁을 함께 반영하며, 명동·강남 중심과 달리 가로수길 등은 유동 데이터 기준으로 활성도를 구분합니다.`
        : c2.hnb <= 12
-         ? "뷰티·생활잡화 매장은 유동 인프라 참고 수준이며, 건강·약업 직접 경쟁으로 보지 않습니다."
-         : "H&B 매장이 다수 있으나 약국·건강 직접 경쟁과는 구분됩니다. 유동·집객 참고용으로만 활용하세요."],
+         ? "뷰티·생활잡화 매장은 제품 구색(약 30% 뷰티) 관점에서 수요·경쟁을 소폭 반영합니다."
+         : "H&B가 다수입니다. 뷰티 카테고리 경쟁이 커질 수 있어 구색·차별화가 필요합니다."],
     [b.parking && hasParking(b) ? "ok" : "no",
      "주차 여건",
      hasParking(b)
@@ -1300,10 +1388,12 @@ function render(){
   const footPct = tm.footTrafficProxy != null ? Math.round(tm.footTrafficProxy * 100) : null;
   const footLabel = footPct == null ? "확인 필요" : (footPct >= 55 ? "높음" : footPct >= 35 ? "보통" : "낮음");
   const vitalityLabel = vitalityPct == null ? "확인 필요" : (vitalityPct >= 60 ? "높음" : vitalityPct >= 40 ? "보통" : "낮음");
+  const zoneLabel = tm.districtZoneLabel || districtZoneLabel(tm.districtZone || "general");
   $("trafficGrid").innerHTML = [
     ["상권 유형", t.bizType, ""],
-    ["상권 활성도", vitalityLabel, vitalityPct != null ? `프리미엄·리테일·유동 종합 (${vitalityPct}점) — 경쟁 점수 보정에 반영` : ""],
-    ["유동·관광 프록시", footLabel, footPct != null ? `관광·문화 POI ${tm.tourismPoiCount || 0}개 · 집객시설 ${tm.landmarkCount || 0}개 (${footPct}점)` : ""],
+    ["상권 권역", zoneLabel, "주소 권역 분류 — 가로수길·신사는 명동·강남 중심과 별도 평가"],
+    ["상권 활성도", vitalityLabel, vitalityPct != null ? `유동·관광 POI·지하철·백화점 데이터 종합 (${vitalityPct}점)` : ""],
+    ["유동 프록시", footLabel, footPct != null ? `관광·문화 ${tm.tourismPoiCount || 0}개 · 집객 ${tm.landmarkCount || 0}개 · 지하철 ${tm.subwayDistM != null ? formatDistance(tm.subwayDistM) : "—"} (${footPct}점)` : ""],
     ["피크 시간대", t.weekdayPeak, "상권 유형 기반 추정"]
   ].map(m=>`<div class="metric"><div class="l">${m[0]}</div><div class="v" style="font-size:16px">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   $("anchorTable").innerHTML = t.anchors.map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td></tr>`).join("");
@@ -2620,7 +2710,8 @@ function applyPlacesData({ martRes, hospitalRes, schoolRes, subwayRes, outletRes
     landmarkCount: uniqueLandmarks.length,
     tourismPoiCount,
     footTrafficProxy: 0,
-    address: address || DATA.address
+    address: address || DATA.address,
+    districtZone: classifyAddressZone(address || DATA.address)
   });
 
   DATA.traffic.metrics = {
@@ -2651,11 +2742,15 @@ function applyPlacesData({ martRes, hospitalRes, schoolRes, subwayRes, outletRes
       landmarkCount: uniqueLandmarks.length,
       tourismPoiCount,
       footTrafficProxy: DATA.traffic.metrics.footTrafficProxy,
-      address: address || DATA.address
+      address: address || DATA.address,
+      districtZone: classifyAddressZone(address || DATA.address)
     });
   }
 
-  DATA.traffic.weekdayPeak = /관광/.test(DATA.traffic.bizType || "")
+  DATA.traffic.metrics.districtZone = classifyAddressZone(address || DATA.address);
+  DATA.traffic.metrics.districtZoneLabel = districtZoneLabel(DATA.traffic.metrics.districtZone);
+
+  DATA.traffic.weekdayPeak = /메가 허브|관광/.test(DATA.traffic.bizType || "")
     ? "평일 오후·주말·공휴일 (관광·유동 상권)"
     : "오전 10–12시 / 오후 4–7시";
 

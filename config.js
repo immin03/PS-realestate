@@ -1,5 +1,5 @@
 window.APP_CONFIG = {
-  HB_KEYWORDS: ["올리브영", "다이소", "롭스", "왓슨스", "부츠"], // 지도·참고 표시용 (경쟁 점수 페널티 거의 없음)
+  HB_KEYWORDS: ["올리브영", "다이소", "롭스", "왓슨스", "부츠"],
   WAREHOUSE_PHARMACY_NAMES: [],
   WEIGHTS: { demand: 25, traffic: 20, competition: 20, economics: 20, physical: 15 },
   BENCHMARK_RENT_PER_PY: 9.0,
@@ -39,6 +39,13 @@ window.APP_CONFIG = {
       HNB_HIGH_THRESHOLD: 18,
       HNB_PENALTY_PER_STORE: 0.003,
       HNB_PENALTY_CAP: 0.05,
+      HNB_BEAUTY_SWEET_MIN: 4,
+      HNB_BEAUTY_SWEET_MAX: 18,
+      HNB_BEAUTY_DEMAND_BONUS: 0.055,
+      HNB_BEAUTY_COMP_START: 20,
+      HNB_BEAUTY_COMP_PER: 0.005,
+      HNB_BEAUTY_COMP_CAP: 0.09,
+      BEAUTY_PRODUCT_SHARE: 0.3,
       PREMIUM_VITALITY_MIN: 0.4,
       PREMIUM_SCORE_FLOOR: 0.48,
       PREMIUM_SCORE_FLOOR_BOOST: 0.32,
@@ -46,13 +53,20 @@ window.APP_CONFIG = {
       HUB_PHARMACY_SWEET_MAX: 30,
       HUB_PHARMACY_BONUS: 0.09,
       RETAIL_ECOSYSTEM_HNB_MIN: 5,
-      RETAIL_ECOSYSTEM_BONUS: 0.07,
-      SYNERGY_BONUS_MAX: 4
+      RETAIL_ECOSYSTEM_BONUS: 0.04,
+      SYNERGY_BONUS_MAX: 4,
+      SOFT_CORRIDOR_VITALITY_CAP: 0.46,
+      SOFT_CORRIDOR_STRICT_CAP: 0.4
     },
+    MEGA_HUB_KEYWORDS: [
+      "명동", "을지로", "광화문", "종로", "동대문", "강남대로", "강남역", "서울역", "잠실", "코엑스", "여의도"
+    ],
+    SOFT_CORRIDOR_KEYWORDS: [
+      "가로수", "신사동", "신사역", "도산대로", "도산"
+    ],
     PREMIUM_DISTRICT_KEYWORDS: [
-      "성수", "명동", "강남", "신사", "홍대", "이태원", "압구정", "청담", "가로수",
-      "역삼", "을지로", "동대문", "한남", "삼성", "잠실", "여의도", "선릉", "논현",
-      "건대", "왕십리", "광화문", "종로", "서울역", "코엑스", "판교", "분당"
+      "성수", "강남", "신사", "홍대", "이태원", "압구정", "청담",
+      "역삼", "한남", "삼성", "선릉", "논현", "건대", "왕십리", "판교", "분당"
     ],
     PHYSICAL: {
       AREA_IDEAL_PY: 200,
