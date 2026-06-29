@@ -37,14 +37,14 @@
 
   .letterhead{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
   .wordmark{ font-weight:700; letter-spacing:0.42em; font-size:17px; }
-  .logo-img{ display:block; object-fit:contain; object-position:center; }
-  .logo-img.gate{ height:22px; width:auto; max-width:min(280px, 100%); }
-  .logo-img.letter{ height:20px; width:auto; max-width:220px; }
-  .logo-img.footer{ height:14px; width:auto; max-width:160px; }
-  .logo-badge{ background:#fff; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; box-sizing:border-box; }
-  .logo-badge.gate{ padding:14px 28px; max-width:calc(100% - 24px); }
-  .logo-badge.letter{ padding:10px 18px; border:1px solid var(--hairline); }
-  .logo-badge.footer{ padding:6px 14px; border:1px solid var(--hairline); }
+  .logo-img{ display:block; width:200px; max-width:100%; height:auto; object-fit:contain; object-position:center; }
+  .logo-img.gate{ width:min(240px, 72vw); }
+  .logo-img.letter{ width:min(200px, 48vw); }
+  .logo-img.footer{ width:min(168px, 40vw); }
+  .logo-badge{ background:#fff; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; box-sizing:border-box; flex-shrink:0; line-height:0; overflow:hidden; }
+  .logo-badge.gate{ padding:14px 24px; max-width:calc(100% - 24px); }
+  .logo-badge.letter{ padding:10px 16px; border:1px solid var(--hairline); }
+  .logo-badge.footer{ padding:8px 14px; border:1px solid var(--hairline); }
   .gate-overlay{ position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:24px 16px; }
   .gate-card{ max-width:420px; width:100%; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 16px 48px rgba(0,0,0,0.1); background:var(--paper); }
   .gate-card-head{ background:linear-gradient(180deg,#1a1a1a 0%,#0f0f0f 100%); padding:40px 28px 32px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px; }
@@ -159,7 +159,8 @@
 
   body.external .internal-only{ display:none !important; }
   .footer{ margin-top:48px; padding-top:14px; border-top:1px solid var(--hairline); font-size:10.5px; color:var(--gray); line-height:1.7; }
-  .footer .ftr-row{ display:flex; justify-content:space-between; margin-top:10px; font-size:11px; }
+  .footer .ftr-row{ display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:10px; font-size:11px; }
+  .footer .ftr-row span{ flex-shrink:0; color:var(--gray); }
 
 @page {
   margin: 14mm 12mm 18mm 12mm;
