@@ -37,23 +37,25 @@
 
   .letterhead{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
   .wordmark{ font-weight:700; letter-spacing:0.42em; font-size:17px; }
-  .logo-img{ height:30px; width:auto; display:block; object-fit:contain; }
-  .logo-img.sm{ height:24px; }
-  .logo-img.gate{ height:26px; margin:0 auto; }
-  .logo-img.letter{ height:22px; }
-  .logo-img.footer{ height:16px; }
-  .logo-panel{ background:#0a0a0a; padding:10px 16px; border-radius:6px; display:inline-flex; align-items:center; }
-  .logo-panel.footer{ padding:6px 12px; border-radius:4px; }
-  .gate-overlay{ position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px; }
-  .gate-card{ max-width:400px; width:100%; border-radius:12px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 12px 40px rgba(0,0,0,0.08); background:var(--paper); }
-  .gate-card-head{ background:#0a0a0a; padding:36px 32px 28px; text-align:center; }
-  .gate-card-body{ padding:32px 36px 40px; text-align:center; }
-  .confidential.light{ color:rgba(255,255,255,0.5); margin-top:10px; }
-  .gate-lead{ font-size:13.5px; color:#444; margin:0 0 18px; line-height:1.65; }
-  .gate-input{ width:100%; height:46px; border:1px solid var(--hairline); border-radius:8px; padding:0 14px; font-size:15px; font-family:inherit; text-align:center; letter-spacing:0.06em; }
-  .gate-input:focus{ outline:none; border-color:var(--ink); }
+  .logo-img{ display:block; object-fit:contain; object-position:center; }
+  .logo-img.gate{ height:22px; width:auto; max-width:min(280px, 100%); }
+  .logo-img.letter{ height:20px; width:auto; max-width:220px; }
+  .logo-img.footer{ height:14px; width:auto; max-width:160px; }
+  .logo-badge{ background:#fff; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; box-sizing:border-box; }
+  .logo-badge.gate{ padding:14px 28px; max-width:calc(100% - 24px); }
+  .logo-badge.letter{ padding:10px 18px; border:1px solid var(--hairline); }
+  .logo-badge.footer{ padding:6px 14px; border:1px solid var(--hairline); }
+  .gate-overlay{ position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:24px 16px; }
+  .gate-card{ max-width:420px; width:100%; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 16px 48px rgba(0,0,0,0.1); background:var(--paper); }
+  .gate-card-head{ background:linear-gradient(180deg,#1a1a1a 0%,#0f0f0f 100%); padding:40px 28px 32px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .gate-card-body{ padding:36px 32px 44px; text-align:center; }
+  .confidential.light{ color:rgba(255,255,255,0.55); font-size:11.5px; letter-spacing:0.02em; }
+  .gate-lead{ font-size:14px; color:#444; margin:0 0 20px; line-height:1.7; }
+  .gate-input{ width:100%; height:48px; border:1px solid var(--hairline); border-radius:8px; padding:0 16px; font-size:15px; font-family:inherit; text-align:center; letter-spacing:0.08em; box-sizing:border-box; }
+  .gate-input:focus{ outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(17,17,17,0.06); }
   .gate-input.err{ border-color:var(--red); }
-  #gateErr{ font-size:12px; color:var(--red); margin-top:10px; min-height:18px; visibility:hidden; }
+  .gate-btn{ width:100%; margin-top:14px; height:48px; font-size:15px; }
+  #gateErr{ font-size:12px; color:var(--red); margin-top:12px; min-height:18px; line-height:1.5; visibility:hidden; }
   #gateErr.show{ visibility:visible; }
   .recent-searches{ max-width:900px; margin:6px auto 0; padding:0 16px; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
   .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; }
@@ -234,13 +236,15 @@ const TYPE_PROFILES = {
 <div id="gate" class="gate-overlay">
   <div class="gate-card">
     <div class="gate-card-head">
-      <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img gate">
+      <div class="logo-badge gate">
+        <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img gate">
+      </div>
       <div class="confidential light">Strictly Private &amp; Confidential</div>
     </div>
     <div class="gate-card-body">
       <p class="gate-lead">본 리포트는 관계자 전용 자료입니다.<br>전달받으신 접속 코드를 입력해 주세요.</p>
       <input type="text" id="gateInput" class="gate-input" placeholder="접속 코드" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
-      <button class="btn" id="gateBtn" type="button" style="width:100%; margin-top:12px; height:46px;">확인</button>
+      <button class="btn gate-btn" id="gateBtn" type="button">확인</button>
       <p id="gateErr">접속 코드가 올바르지 않습니다. 대소문자 구분 없이 다시 입력해 주세요.</p>
     </div>
   </div>
@@ -306,7 +310,9 @@ const TYPE_PROFILES = {
 <div class="sheet" id="report">
 
   <div class="letterhead">
-    <div class="logo-panel"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img letter"></div>
+    <div class="logo-badge letter">
+      <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img letter">
+    </div>
     <div class="confidential">Strictly Private &amp; Confidential</div>
   </div>
 
@@ -444,7 +450,7 @@ const TYPE_PROFILES = {
     본 자료는 파마스퀘어 사업 모델 관련 사업 협력 검토 목적의 참고자료로서 작성되었으며, 제공된 내용은 현재 시점에서의 가정, 시장 환경, 내부 분석 및 제한된 정보에 기반하여 작성되었습니다.
     본 자료에 포함된 수치는 추정치로서 실제 운영 환경, 입지 조건, 시장 상황 등에 따라 상당한 차이가 발생할 수 있으며, 특정 성과 또는 수익을 보장하지 않습니다.
     본 자료에 포함된 모든 정보는 기밀 정보로서 사전 서면 동의 없이 제3자에게 제공, 복제 또는 공개될 수 없습니다.
-    <div class="ftr-row"><div class="logo-panel footer"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img footer"></div><span id="ftrDate">—</span></div>
+    <div class="ftr-row"><div class="logo-badge footer"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img footer"></div><span id="ftrDate">—</span></div>
   </div>
 </div>
 
