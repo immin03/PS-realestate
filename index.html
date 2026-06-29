@@ -17,8 +17,9 @@
 
   /* ===== Toolbar (screen only) ===== */
   .toolbar{ max-width:900px; margin:0 auto; padding:20px 16px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .toolbar input[type=text]{ flex:1; min-width:240px; height:42px; border:1px solid var(--hairline); border-radius:8px;
+  .toolbar input[type=text]{ flex:1; min-width:200px; height:42px; border:1px solid var(--hairline); border-radius:8px;
         padding:0 14px; font-size:14px; font-family:inherit; background:var(--paper); }
+  .toolbar input[type=number].area-in{ flex:0 0 88px; min-width:88px; width:88px; text-align:center; }
   .toolbar input[type=text]:focus{ outline:none; border-color:var(--ink); }
   .btn{ height:42px; padding:0 18px; border-radius:8px; border:1px solid var(--ink); background:var(--ink); color:#fff;
         font-size:14px; font-weight:600; cursor:pointer; font-family:inherit; }
@@ -307,6 +308,7 @@ const TYPE_PROFILES = {
 
 <div class="toolbar">
   <input type="text" id="addrInput" value="" placeholder="주소 입력 (도로명·지번)">
+  <input type="number" class="area-in" id="areaInput" min="80" max="500" step="1" placeholder="평수" title="임대 전용면적(평) — 가맹(건물주) 손익 산정용">
   <button class="btn" id="runBtn">분석</button>
   <div class="store-model" title="출점 검토 기준을 선택합니다">
     <button id="storeDirect" class="on">직영 출점</button>
@@ -318,7 +320,7 @@ const TYPE_PROFILES = {
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
 </div>
-<p class="demo-note" id="demoNote">주소와 <b>출점 기준(직영/가맹)</b>을 선택한 뒤 <b>분석</b>을 누르면 건물 유형·상권·적합도가 자동 분석됩니다.</p>
+<p class="demo-note" id="demoNote">주소·<b>평수</b>·출점 기준을 선택한 뒤 <b>분석</b>을 누르세요. 가맹(건물주) 모드는 도심형 180평 기준 손익을 바탕으로 <b>공실 시 임대 대비 수익</b>을 추정합니다.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -437,7 +439,8 @@ const TYPE_PROFILES = {
     <div class="sec-title direct-tone">상가 시세 — 실거래가 기준</div>
     <div class="sec-title franchise-tone">상권 시세 · 임대 전망</div>
     <div class="sec-lead direct-tone">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
-    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — 인근 <b>실거래·거래량</b>으로 공실 대비 임대 전망과 상권 사업성을 참고합니다. 본사 손익 모델과는 별도로 해석합니다.</div>
+    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — <b>도심형 180평 표준 손익</b>을 입력 평수·상권에 맞게 환산해, 인근 임대 시세 대비 <b>직접 운영 수익</b>을 비교합니다(임대료 0원 전제).</div>
+    <div class="grid franchise-tone" style="margin-bottom:16px;" id="franchiseEconGrid"></div>
     <div class="grid" style="margin-bottom:16px;" id="priceGrid"></div>
     <table class="tbl">
       <thead><tr><th>거래시점</th><th>소재</th><th class="num">전용(평)</th><th class="num">거래금액</th><th class="num">평당가</th></tr></thead>
@@ -486,7 +489,7 @@ const EMPTY = {
   address: "주소를 입력하고 분석을 실행하세요",
   building: {
     type: "근린상가",
-    mainUse: "[분석 후 표시]", floor: "[분석 후 표시]", areaPy: 0,
+    mainUse: "[분석 후 표시]", floor: "[분석 후 표시]", areaPy: 0, leaseAreaPy: 0,
     approvedYear: null, parking: "건물 내 주차 가능 여부 및 대수 현장 확인 필요", landUse: "토지이용계획 확인 필요",
     roadFacing: "전면 도로 폭 및 차량 진출입 가능 여부 현장 확인 필요",
     inBldgUnits: null, occupancy: null, workers: null,
@@ -534,6 +537,10 @@ function isFirstFloor(floorText) {
 
 function clamp01(v) {
   return Math.max(0, Math.min(1, Number(v) || 0));
+}
+
+function clamp(v, min, max) {
+  return Math.max(min, Math.min(max, Number(v) || 0));
 }
 
 function smoothRatio(value, full, soft = 0.65) {
@@ -1118,7 +1125,91 @@ function scoreEconomicsV2(price, max, buildingType, trafficMetrics) {
   return result;
 }
 
-function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, demand, competition) {
+function getEffectiveLeaseAreaPy(building) {
+  const input = toNumber($("areaInput")?.value);
+  if (input >= (CONFIG.FRANCHISE_ECONOMICS?.MIN_AREA_PY || 80)) return input;
+  const lease = toNumber(building?.leaseAreaPy);
+  if (lease > 0) return lease;
+  const bldg = toNumber(building?.areaPy);
+  if (bldg > 0) return bldg;
+  return CONFIG.FRANCHISE_ECONOMICS?.REF_AREA_PY || 180;
+}
+
+function syncAreaInputFromBuilding() {
+  const el = $("areaInput");
+  if (!el || toNumber(el.value) > 0) return;
+  const py = toNumber(DATA.building?.areaPy);
+  if (py > 0) el.value = String(Math.round(py));
+}
+
+function computeLocationSalesMultiplier(trafficMetrics) {
+  const foot = trafficMetrics?.footTrafficProxy || 0.32;
+  const vitality = trafficMetrics?.marketVitality || 0.32;
+  const hnb = detectHNBColocationStrategy(trafficMetrics) ? 0.06 : 0;
+  return clamp(0.7, 0.7 + foot * 0.42 + vitality * 0.26 + hnb, 1.18);
+}
+
+function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
+  const cfg = CONFIG.FRANCHISE_ECONOMICS || {};
+  const refPy = cfg.REF_AREA_PY || 180;
+  const py = Math.max(cfg.MIN_AREA_PY || 100, toNumber(areaPy) || refPy);
+  const locMult = computeLocationSalesMultiplier(trafficMetrics);
+  const areaScale = py / refPy;
+
+  const baseSales = cfg.MONTHLY_SETTLED_SALES || 17531;
+  const grossRatio = cfg.GROSS_CONTRIB_RATIO || (7952 / 17531);
+  const monthlySales = baseSales * Math.pow(areaScale, 0.93) * locMult;
+  const monthlyGrossContrib = monthlySales * grossRatio;
+
+  const maintenance = (cfg.MAINTENANCE_PER_PY || 2.4) * py;
+  const labor = (cfg.LABOR_BASE || 1380) * (0.62 + 0.38 * Math.pow(areaScale, 0.82));
+  const trademark = monthlySales * (cfg.TRADEMARK_RATE || 0.02);
+  const other = (cfg.OTHER_OPEX || 300) * (0.55 + 0.45 * areaScale);
+  const monthlyOpex = maintenance + labor + trademark + other;
+  const monthlyOpProfit = monthlyGrossContrib - monthlyOpex;
+
+  const salesPerPy = monthlySales / py;
+  const opProfitPerPy = monthlyOpProfit / py;
+  const marketRentPy = price?.rentPerPy > 0 ? price.rentPerPy : CONFIG.BENCHMARK_RENT_PER_PY;
+  const leasingIncome = marketRentPy * py;
+  const profitVsRentRatio = leasingIncome > 0 ? monthlyOpProfit / leasingIncome : null;
+
+  return {
+    areaPy: py,
+    locMult: Math.round(locMult * 100) / 100,
+    monthlySales: Math.round(monthlySales),
+    monthlyGrossContrib: Math.round(monthlyGrossContrib),
+    monthlyOpex: Math.round(monthlyOpex),
+    monthlyOpProfit: Math.round(monthlyOpProfit),
+    salesPerPy: Math.round(salesPerPy * 10) / 10,
+    opProfitPerPy: Math.round(opProfitPerPy * 10) / 10,
+    marketRentPy,
+    leasingIncome: Math.round(leasingIncome),
+    profitVsRentRatio: profitVsRentRatio != null ? Math.round(profitVsRentRatio * 100) / 100 : null,
+    marketRentSource: price?.rentPerPy > 0 ? (price.rentSource || "인근 시세 추정") : "본사 기준 임대(9만원/평) 참고"
+  };
+}
+
+function scoreFranchiseProfitVsRent(unitEcon) {
+  const ratio = unitEcon?.profitVsRentRatio;
+  if (ratio == null) return 0.5;
+  if (ratio >= 2.2) return 0.96;
+  if (ratio >= 1.7) return 0.9;
+  if (ratio >= 1.35) return 0.82;
+  if (ratio >= 1.1) return 0.72;
+  if (ratio >= 0.95) return 0.6;
+  if (ratio >= 0.8) return 0.46;
+  if (ratio >= 0.65) return 0.34;
+  return 0.22;
+}
+
+function formatManwon(amount) {
+  const n = Number(amount);
+  if (!Number.isFinite(n)) return "—";
+  return `${fmt(Math.round(n))}만원`;
+}
+
+function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, demand, competition, building) {
   const cfg = CONFIG.SCORING?.FRANCHISE || {};
   const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
   const vitality = trafficMetrics?.marketVitality || 0;
@@ -1161,10 +1252,20 @@ function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, dem
     + (detectHNBColocationStrategy(trafficMetrics) ? 0.1 : 0)
   );
 
+  const areaPy = getEffectiveLeaseAreaPy(building);
+  const unitEcon = computeFranchiseUnitEconomics(areaPy, trafficMetrics, price);
+  const profitVsRent = scoreFranchiseProfitVsRent(unitEcon);
+  const idealMin = CONFIG.FRANCHISE_ECONOMICS?.IDEAL_AREA_MIN || 150;
+  const idealMax = CONFIG.FRANCHISE_ECONOMICS?.IDEAL_AREA_MAX || 220;
+  const areaFit = areaPy >= idealMin && areaPy <= idealMax ? 0.06 : areaPy >= 120 ? 0.02 : -0.04;
+
   const composite = clamp01(
-    marketActivity * 0.26 + leasingBand * 0.24 + bizViability * 0.4 + compGap + 0.06
+    profitVsRent * 0.42 + bizViability * 0.28 + marketActivity * 0.14 + leasingBand * 0.1 + compGap + areaFit + 0.06
   );
-  return Math.round(composite * max);
+  return {
+    score: Math.round(composite * max),
+    unitEcon
+  };
 }
 
 function scorePhysicalV2(building, max, trafficMetrics) {
@@ -1330,11 +1431,21 @@ function computeFullScore(data) {
     demand: scoreDemandV2(data.demand, W.demand, prof.factor, data.traffic?.metrics),
     traffic: scoreTrafficV2(data.traffic, data.landmarks, W.traffic, data.traffic?.metrics),
     competition: scoreCompetitionV2(data.competition, W.competition, marketContext),
-    economics: isFranchiseStoreModel()
-      ? scoreFranchiseViabilityV2(data.price, W.economics, b.type, data.traffic?.metrics, data.demand, data.competition)
-      : scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics),
+    economics: (() => {
+      if (!isFranchiseStoreModel()) {
+        return scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics);
+      }
+      const fr = scoreFranchiseViabilityV2(
+        data.price, W.economics, b.type, data.traffic?.metrics, data.demand, data.competition, b
+      );
+      return fr.score;
+    })(),
     physical: scorePhysicalV2(b, W.physical, data.traffic?.metrics)
   };
+
+  const franchiseUnitEcon = isFranchiseStoreModel()
+    ? computeFranchiseUnitEconomics(getEffectiveLeaseAreaPy(b), data.traffic?.metrics, data.price)
+    : null;
 
   let total = Object.values(sc).reduce((a, v) => a + v, 0);
 
@@ -1375,7 +1486,9 @@ function computeFullScore(data) {
     isPremiumHub,
     pharmacyOversaturated: detectPharmacyOversaturation(data.competition, compCfg),
     districtZone: data.traffic?.metrics?.districtZone || "general",
-    storeModel: isFranchiseStoreModel() ? "franchise" : "direct"
+    storeModel: isFranchiseStoreModel() ? "franchise" : "direct",
+    franchiseUnitEcon,
+    leaseAreaPy: getEffectiveLeaseAreaPy(b)
   };
 }
 
@@ -1553,7 +1666,11 @@ function buildInternalMemo(scoreResult, d) {
     ["축별 점수", `수요 ${sc.demand} · 유동 ${sc.traffic} · 경쟁 ${sc.competition} · ${isFranchiseStoreModel() ? "사업성" : "경제성"} ${sc.economics} · 물리 ${sc.physical}`],
     ["데이터 신뢰도", `${confidence}% — ${confidence < 50 ? "판단 보류 권고" : confidence < 75 ? "보수적 해석" : "판단 가능"}`],
     ["임대·시세", isFranchiseStoreModel()
-      ? (rent == null ? `실거래 ${d.price?.deals12mo || 0}건 — 공실·시세 현장 확인` : `인근 시세 ${rent}만원/평 · 거래 ${d.price?.deals12mo || 0}건`)
+      ? (() => {
+          const u = scoreResult.franchiseUnitEcon;
+          if (!u) return rent == null ? "면적·시세 입력 후 산정" : `인근 시세 ${rent}만원/평`;
+          return `${u.areaPy}평 · 임대대비 ${u.profitVsRentRatio != null ? u.profitVsRentRatio.toFixed(2) : "—"}배 · 월이익 ${formatManwon(u.monthlyOpProfit)}`;
+        })()
       : (rent == null ? "실거래 부족 — 임대료 협상 전제 불명확" : rent <= CONFIG.BENCHMARK_RENT_PER_PY ? `평당 ${rent}만원 — 기준 이내` : `평당 ${rent}만원 — 기준 상회, 협상 필요`)],
     ["창고형 경쟁", c1.warehouse > 0 ? `1km 내 ${c1.warehouse}개소 — 직접 경쟁, 출점 재검토` : `1km 내 미탐지 · 2km ${c2.warehouse || 0}개소`],
     ["상권 활성도", (() => {
@@ -1604,9 +1721,15 @@ function buildOpinionText(d, scoreResult, warns, rentPerPy, rentOk) {
       `배후 주거는 약 <b>${fmt(dm.households5km)}세대</b>이며, 반경 5km 내 약국 <b>${c5.pharmacies}</b>개소, 창고형 약국 <b>${c5.warehouse}</b>개소가 확인되었습니다. ` +
       `${hasParking(b) ? `주차 여건(<b>${parkingLabel}</b>)이 확보되어 있습니다. ` : hnbColocation ? `본 입지는 <b>H&B 동선 상권</b>으로 보행·집객을 우선 반영했습니다. ` : ""}` +
       (isFranchiseStoreModel()
-        ? (rentPerPy == null
-          ? `인근 실거래가 제한적이어서 임대 전망은 현장 공실·시세 확인이 필요합니다. `
-          : `건물주 보유 상가 기준으로 인근 시세(평당 약 <b>${rentPerPy}만원</b>)와 상권 사업성을 함께 검토했습니다. `)
+        ? (() => {
+            const u = scoreResult.franchiseUnitEcon;
+            if (u) {
+              return `건물주 보유 상가(<b>${u.areaPy}평</b>) 기준, 월 영업이익 약 <b>${formatManwon(u.monthlyOpProfit)}</b>으로 인근 임대수익 대비 <b>${u.profitVsRentRatio != null ? u.profitVsRentRatio.toFixed(2) : "—"}배</b>로 추정됩니다. `;
+            }
+            return rentPerPy == null
+              ? `인근 실거래가 제한적이어서 임대 전망은 현장 공실·시세 확인이 필요합니다. `
+              : `건물주 보유 상가 기준으로 인근 시세(평당 약 <b>${rentPerPy}만원</b>)와 상권 사업성을 함께 검토했습니다. `;
+          })()
         : (rentPerPy == null
           ? `인근 실거래가 기준 임대료 추정이 어려워, 경제성은 현장 임대 조건 확인이 필요합니다. `
           : `평당 임대료는 약 <b>${rentPerPy}만원</b>으로 추정되며, 본사 표준 손익 모델 대비 ${rentOk ? "적정 수준" : "다소 높은 편"}으로 분석됩니다. `)) +
@@ -1637,12 +1760,14 @@ function render(){
   $("mDate").textContent = dateStr;
   $("ftrDate").textContent = dateStr + " 작성";
 
+  const leasePyBadge = getEffectiveLeaseAreaPy(b);
+
   /* I. 개요 + 유형 분석 */
   $("bldgBadges").innerHTML =
     `<span class="badge">${b.type}</span>` +
     (b.type === "지식산업센터" ? `<span class="badge alert">용도 제약 검토 필요</span>` : "") +
     `<span class="badge soft">${b.mainUse}</span>` +
-    `<span class="badge soft">${b.floor} · ${b.areaPy ? `건물 연면적 약 ${b.areaPy}평` : "임대 전용면적 확인 필요"}</span>` +
+    `<span class="badge soft">${b.floor} · ${leasePyBadge ? `분석면적 약 ${leasePyBadge}평` : "임대 전용면적 확인 필요"}</span>` +
     (b.approvedYear ? `<span class="badge soft">사용승인 ${b.approvedYear}년</span>` : "");
   $("bldgTable").innerHTML = [
     ["용도지역", b.landUse], ["주차", b.parking], ["도로 조건", b.roadFacing]
@@ -1712,6 +1837,8 @@ function render(){
   const hnbColocation = detectHNBColocationStrategy({ ...(d.traffic?.metrics || {}), hnb2km: c2.hnb });
   const franchiseMode = isFranchiseStoreModel();
   const p = d.price;
+  const unitEcon = scoreResult.franchiseUnitEcon;
+  const leasePy = scoreResult.leaseAreaPy || getEffectiveLeaseAreaPy(b);
   const fits = [
     [c2.warehouse === 0 ? "ok" : (c1.warehouse === 0 ? "cond" : "no"),
      "창고형 약국·유사 업태",
@@ -1745,31 +1872,51 @@ function render(){
        : hnbColocation
          ? "주차 미확보. 올리브영·다이소 등 H&B 동선 입점 전략에서는 보행·집객이 우선이나, 방문 주차 여부는 현장 확인이 필요합니다."
          : "주차 미확보. 차량 중심 교외 입지에서는 주차 확보가 중요합니다."],
-    [b.areaPy >= 200 ? "ok" : (b.areaPy >= 150 ? "cond" : "no"),
-     `매장 면적 — 임대 전용면적 확인 필요`,
-     b.areaPy >= 200
-       ? "건축물대장상 면적은 확인되었으나, 실제 임대 전용면적은 현장/임대조건 확인이 필요합니다."
-       : "실제 임대 전용면적 확인 후 표준 모델 적용 가능 여부를 재검토해야 합니다."],
+    [franchiseMode
+        ? (leasePy >= 150 && leasePy <= 220 ? "ok" : leasePy >= 120 ? "cond" : "no")
+        : (b.areaPy >= 200 ? "ok" : (b.areaPy >= 150 ? "cond" : "no")),
+     franchiseMode ? `매장 면적 — ${leasePy}평 (입력·추정)` : `매장 면적 — 임대 전용면적 확인 필요`,
+     franchiseMode
+       ? (leasePy >= 150 && leasePy <= 220
+          ? `도심형 표준(150~220평) 범위입니다. 손익은 이 면적 기준으로 환산했습니다.`
+          : leasePy >= 120
+            ? `표준 모델 대비 면적이 다릅니다. 평당 매출·비용을 면적에 맞게 조정해 추정했습니다.`
+            : `면적이 작아 표준 모델(180평) 대비 효율이 낮을 수 있습니다.`)
+       : (b.areaPy >= 200
+          ? "건축물대장상 면적은 확인되었으나, 실제 임대 전용면적은 현장/임대조건 확인이 필요합니다."
+          : "실제 임대 전용면적 확인 후 표준 모델 적용 가능 여부를 재검토해야 합니다.")],
     [dm.households5km >= householdThreshold ? "ok" : "cond",
      householdLabel,
      dm.households5km >= householdThreshold
        ? `기준 규모(${fmt(householdThreshold)}세대) 이상입니다.`
        : `기준 규모 미만 — 광역 차량 유입 의존도가 높아질 수 있습니다.`],
-    [franchiseMode
-        ? (p.deals12mo >= 3 && vitalityPct >= 40 ? "ok" : (p.deals12mo >= 1 || vitalityPct >= 35 ? "cond" : "no"))
-        : (rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no"))),
-     franchiseMode
-       ? `상권·임대 전망 — 최근 거래 ${p.deals12mo}건`
-       : (rentPerPy == null ? "임대료 수준 — 추정 불가" : `임대료 수준 — 평당 ${rentPerPy}만원/월`),
-     franchiseMode
-       ? (p.deals12mo >= 3
-          ? `인근 상업 실거래 ${p.deals12mo}건 — 시세 참고 가능. 상권 활성도 ${vitalityPct ?? "—"}점·H&B·병원 시너지로 사업성·임대 전망을 평가했습니다.`
-          : p.deals12mo >= 1
-            ? `실거래 ${p.deals12mo}건 — 시세 참고는 제한적입니다. 공실·호가는 현장 확인이 필요합니다.`
-            : "인근 실거래 부족 — 공실·임대 전망은 현장 조사 전제입니다.")
-       : (rentGapPct == null
-          ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
-          : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`)],
+    [franchiseMode && unitEcon
+        ? (unitEcon.profitVsRentRatio >= 1.35 ? "ok" : unitEcon.profitVsRentRatio >= 1.05 ? "cond" : "no")
+        : franchiseMode
+          ? (p.deals12mo >= 3 && vitalityPct >= 40 ? "ok" : (p.deals12mo >= 1 || vitalityPct >= 35 ? "cond" : "no"))
+          : (rentGapPct == null ? "cond" : (rentGapPct <= 0 ? "ok" : (rentGapPct <= 10 ? "cond" : "no"))),
+     franchiseMode && unitEcon
+       ? `시세 대비 수익 — 임대 대비 ${unitEcon.profitVsRentRatio != null ? unitEcon.profitVsRentRatio.toFixed(2) : "—"}배`
+       : franchiseMode
+         ? `상권·임대 전망 — 최근 거래 ${p.deals12mo}건`
+         : (rentPerPy == null ? "임대료 수준 — 추정 불가" : `임대료 수준 — 평당 ${rentPerPy}만원/월`),
+     franchiseMode && unitEcon
+       ? `${leasePy}평 기준 월 영업이익 <b>${formatManwon(unitEcon.monthlyOpProfit)}</b>(평당 ${unitEcon.opProfitPerPy}만원) · 인근 임대수익 ${formatManwon(unitEcon.leasingIncome)}(평당 ${unitEcon.marketRentPy}만원). ${
+           unitEcon.profitVsRentRatio >= 1.15
+             ? "공실 시 직접 운영이 임대 출점보다 유리한 구조로 추정됩니다."
+             : unitEcon.profitVsRentRatio >= 0.95
+               ? "임대·직접운영 손익이 비슷합니다. 상권·운영 역량에 따라 선택이 갈립니다."
+               : "공실 시 시세 임대가 직접 운영보다 나을 수 있습니다."
+         }`
+       : franchiseMode
+         ? (p.deals12mo >= 3
+            ? `인근 상업 실거래 ${p.deals12mo}건 — 시세 참고 가능. 상권 활성도 ${vitalityPct ?? "—"}점 반영.`
+            : p.deals12mo >= 1
+              ? `실거래 ${p.deals12mo}건 — 시세 참고 제한적. 공실·호가 현장 확인 필요.`
+              : "인근 실거래 부족 — 공실·임대 전망은 현장 조사 전제입니다.")
+         : (rentGapPct == null
+            ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
+            : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`)],
   ];
   const marks = { ok:"●", cond:"◐", no:"○" };
   const fitRow = f => `<div class="fit"><div class="fit-mark ${f[0]}">${marks[f[0]]}</div>
@@ -1832,6 +1979,20 @@ function render(){
   renderCompetition(currentRadius);
 
   /* VII. 시세 */
+  if (franchiseMode && unitEcon) {
+    const u = unitEcon;
+    $("franchiseEconGrid").innerHTML = [
+      ["분석 면적", `${u.areaPy}평`, "입력값 우선 · 미입력 시 건축물대장 추정", true],
+      ["월 추정 매출", formatManwon(u.monthlySales), `도심형 180평 기준 × 상권계수 ${u.locMult}`, false],
+      ["평당 월매출", `${u.salesPerPy}만원/평`, "정산매출(매장+전대) 환산", false],
+      ["월 영업이익", formatManwon(u.monthlyOpProfit), "임대료 0원(건물주 보유) 전제", true],
+      ["평당 영업이익", `${u.opProfitPerPy}만원/평`, "관리비·인건비·로열티 반영", false],
+      ["인근 임대 시세", `${u.marketRentPy}만원/평`, u.marketRentSource, false],
+      ["임대 대비 수익", u.profitVsRentRatio != null ? `${u.profitVsRentRatio.toFixed(2)}배` : "—", `공실 시 월 ${formatManwon(u.leasingIncome)} 임대 vs 직접운영 비교`, true]
+    ].map(m => `<div class="metric ${m[3] ? "hl" : ""}"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
+  } else if ($("franchiseEconGrid")) {
+    $("franchiseEconGrid").innerHTML = "";
+  }
   $("priceGrid").innerHTML = [
     ["평당 매매 실거래가", p.salePerPy > 0 ? fmt(p.salePerPy)+"만원" : "확인 필요", `반경 ${tradeKm}km 내 최근 12개월 평균`, true],
     [franchiseMode ? "인근 임대 시세(추정)" : "평당 임대료(월)", p.rentPerPy == null ? "추정 불가" : `${p.rentPerPy}만원`, franchiseMode ? "공실 대비 임대 전망 참고" : (p.rentSource || "매매 실거래 기반 추정"), false],
@@ -3411,6 +3572,10 @@ async function runPublicDataAnalysis(kakaoResult) {
   let params = getAddressParamsFromKakao(kakaoResult);
 
   DATA.address = params.fullAddress || addr;
+  const areaVal = toNumber($("areaInput")?.value);
+  if (areaVal >= (CONFIG.FRANCHISE_ECONOMICS?.MIN_AREA_PY || 80)) {
+    DATA.building.leaseAreaPy = areaVal;
+  }
   DATA.mapCenter = { lat: params.lat, lng: params.lng };
   DATA.price.rentPerPy = null;
   DATA.price.rentSource = null;
@@ -3488,6 +3653,9 @@ async function runPublicDataAnalysis(kakaoResult) {
 
   if (buildingWrap && !buildingWrap.error) applyBuildingData(buildingWrap);
   else DATA.building.type = inferBuildingTypeFromAddress(addr);
+  syncAreaInputFromBuilding();
+  const syncedArea = toNumber($("areaInput")?.value);
+  if (syncedArea > 0) DATA.building.leaseAreaPy = syncedArea;
 
   if (landuseWrap && !landuseWrap.error && landuseWrap.ok !== false) applyLanduseData(landuseWrap);
 
@@ -3604,6 +3772,15 @@ $("storeDirect").addEventListener("click", ()=>{
 $("storeFranchise").addEventListener("click", ()=>{
   applyStoreModel("franchise");
   if (DATA.address && DATA.address !== "—") render();
+});
+$("areaInput")?.addEventListener("change", () => {
+  const py = toNumber($("areaInput")?.value);
+  if (py > 0) DATA.building.leaseAreaPy = py;
+  if (DATA.address && DATA.address !== "—" && DATA.address !== "주소를 입력하고 분석을 실행하세요") render();
+});
+$("areaInput")?.addEventListener("input", () => {
+  const py = toNumber($("areaInput")?.value);
+  if (py > 0) DATA.building.leaseAreaPy = py;
 });
 initStoreModel();
 if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
