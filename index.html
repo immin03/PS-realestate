@@ -633,9 +633,19 @@ function applyFootTrafficScoreCap(composite, foot, cfg) {
   return capped;
 }
 
+function detectCorridorBeautyRetail(metrics) {
+  const zone = metrics?.districtZone || "general";
+  if (zone !== "soft_corridor") return false;
+  const hnb2 = metrics?.hnb2km || 0;
+  const landmarks = metrics?.landmarkCount || 0;
+  const subwayNear = metrics?.subwayDistM != null && Number(metrics.subwayDistM) <= 650;
+  return hnb2 >= 4 && (subwayNear || landmarks >= 2);
+}
+
 function detectCorridorStagnation(metrics) {
   const zone = metrics?.districtZone || "general";
   if (zone !== "soft_corridor") return false;
+  if (detectCorridorBeautyRetail(metrics)) return false;
   const tourism = metrics?.tourismPoiCount || 0;
   const hnb2 = metrics?.hnb2km || 0;
   const dept = metrics?.deptCount || 0;
@@ -658,15 +668,17 @@ function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
 
   if (zone === "soft_corridor") {
     let s = 0;
-    if (subwayNear) s += 0.06;
-    else if (subwayWalk) s += 0.03;
+    if (subwayNear) s += 0.08;
+    else if (subwayWalk) s += 0.04;
     if (tourismPoi >= 2) s += 0.08;
     if (tourismPoi >= 5) s += 0.1;
     if (deptCount > 0) s += 0.07;
-    if (landmarkCount >= 2) s += 0.04;
-    if (detectCorridorStagnation({ ...metrics, districtZone: zone })) s *= 0.58;
-    else if (hnb2 >= 5 && tourismPoi < 3) s *= 0.72;
-    const cap = trafficCfg.SOFT_CORRIDOR_FOOT_CAP || 0.36;
+    if (landmarkCount >= 2) s += 0.06;
+    if (landmarkCount >= 4) s += 0.03;
+    const beautyRetail = detectCorridorBeautyRetail({ ...metrics, districtZone: zone });
+    if (detectCorridorStagnation({ ...metrics, districtZone: zone })) s *= 0.68;
+    else if (hnb2 >= 5 && tourismPoi < 3) s *= beautyRetail ? 0.9 : 0.8;
+    const cap = trafficCfg.SOFT_CORRIDOR_FOOT_CAP || 0.4;
     return clamp01(Math.min(s, cap));
   }
 
@@ -714,8 +726,8 @@ function inferBizType({ subwayCount, martCount, landmarkCount, tourismPoiCount, 
 
   if (zone === "soft_corridor") {
     if (corridorStagnant) return "리테일·보행 상권 (유동 둔화 — 가로수길 등)";
-    if (foot >= 0.32 && tourismPoiCount >= 5) return "프리미엄 리테일·보조 유동 상권";
-    return "리테일·보행 상권 (유동 둔화 주의)";
+    if (foot >= 0.3 && (tourismPoiCount >= 3 || foot >= 0.34)) return "프리미엄 리테일·보조 유동 상권";
+    return "리테일·보행 상권 (보조 유동)";
   }
 
   if (zone === "suburban" || suburbanStrip) {
@@ -799,8 +811,13 @@ function computeMarketVitality({ address, metrics, traffic, competition, demand 
   }
 
   if (detectPharmacyOversaturation(competition, compCfg)) {
-    v *= 0.78;
-    v = Math.min(v, 0.55);
+    if (zone === "soft_corridor") {
+      v *= 0.9;
+      v = Math.min(v, 0.58);
+    } else {
+      v *= 0.78;
+      v = Math.min(v, 0.55);
+    }
   }
 
   return clamp01(v);
@@ -924,9 +941,16 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
       hh * 0.2 + age * 0.16 + apt * 0.08 + hubBlend * footBlend + beautyDemand + subwayBoost + 0.12
     );
   } else if (zone === "soft_corridor") {
-    const localFoot = stagnant ? foot * 0.7 : foot * 0.85;
+    const stagnant = trafficMetrics?.corridorStagnant;
+    const beautyRetail = detectCorridorBeautyRetail(trafficMetrics);
+    const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
+    const localFoot = stagnant ? foot * 0.78 : foot * 0.92;
+    const footWeight = (trafficCfg.SOFT_CORRIDOR_DEMAND_FOOT_BLEND || 0.68) * (footBlend / 0.38);
+    const hhWeight = trafficCfg.SOFT_CORRIDOR_DEMAND_HH_WEIGHT || 0.32;
     composite = clamp01(
-      hh * 0.28 + age * 0.22 + apt * 0.14 + localFoot * (footBlend * 0.55) + beautyDemand * 0.7 + subwayBoost * 0.35 + 0.06
+      hh * hhWeight + age * 0.22 + apt * 0.14 + localFoot * footWeight
+      + beautyDemand * (beautyRetail ? 1 : stagnant ? 0.7 : 0.85)
+      + subwayBoost * (beautyRetail ? 0.5 : 0.4) + 0.08
     );
   } else if (zone === "suburban" || trafficMetrics?.suburbanStrip) {
     composite = clamp01(
@@ -954,7 +978,7 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   const school = distanceScore(m.schoolDistM, 500, 1800, 4500);
 
   const accessScale = zone === "mega_hub" || zone === "premium" ? 1
-    : zone === "soft_corridor" ? 0.5
+    : zone === "soft_corridor" ? (detectCorridorBeautyRetail(m) ? 0.62 : 0.55)
     : suburban ? 0.35
     : foot < 0.35 ? 0.45
     : 0.65;
@@ -972,8 +996,8 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   composite = applyFootTrafficScoreCap(composite, foot, cfg);
 
   if (zone === "soft_corridor") {
-    if (stagnant) composite *= 0.82;
-    composite = Math.min(composite, cfg.SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP || 0.5);
+    if (stagnant) composite *= 0.86;
+    composite = Math.min(composite, cfg.SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP || 0.64);
   }
   if (suburban) {
     composite = Math.min(composite, cfg.SUBURBAN_TRAFFIC_CAP || 0.48);
@@ -1120,6 +1144,7 @@ function computeFullScore(data) {
       data.address
     );
     m.corridorStagnant = detectCorridorStagnation(m);
+    m.corridorBeautyRetail = detectCorridorBeautyRetail(m);
     m.suburbanStrip = detectSuburbanStrip(m, data.address);
   }
 
@@ -1554,8 +1579,10 @@ function render(){
   const vitalityLabel = vitalityPct == null ? "확인 필요" : (vitalityPct >= 60 ? "높음" : vitalityPct >= 40 ? "보통" : "낮음");
   const zoneLabel = tm.districtZoneLabel || districtZoneLabel(tm.districtZone || "general");
   const stagnationNote = tm.corridorStagnant
-    ? "H&B는 많으나 관광·집객 POI가 약함 — 가로수길 유동 둔화 구간으로 평가 (광역 지하철·인구는 제외)"
-    : tm.suburbanStrip || tm.districtZone === "suburban"
+    ? "H&B는 많으나 관광·집객 POI가 약함 — 유동 둔화 구간으로 평가"
+    : tm.corridorBeautyRetail
+      ? "보조 상권 — 지하철·집객과 H&B가 공존하는 뷰티 리테일 권역"
+      : tm.suburbanStrip || tm.districtZone === "suburban"
       ? "교외·도로변 상권 — 인근 병원·학교·마트는 접근성이지 보행 유동이 아님"
       : tm.districtZone === "soft_corridor"
         ? "보조 상권 — 5km 광역 지표보다 관광·집객 POI를 우선 반영"
