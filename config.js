@@ -59,6 +59,11 @@ window.APP_CONFIG = {
       SOFT_CORRIDOR_DEMAND_HH_WEIGHT: 0.32,
       SUBURBAN_TRAFFIC_CAP: 0.42,
       SUBURBAN_FOOT_CAP: 0.28,
+      REGIONAL_URBAN_FOOT_CAP: 0.32,
+      REGIONAL_URBAN_TRAFFIC_CAP: 0.44,
+      REGIONAL_URBAN_DEMAND_HH_WEIGHT: 0.38,
+      REGIONAL_URBAN_SALES_LOC_CAP: 0.92,
+      REGIONAL_URBAN_VITALITY_CAP: 0.42,
       CORRIDOR_FOOT_CAP: 0.55,
       CORRIDOR_TRAFFIC_CAP: 0.72,
       CORRIDOR_CLUSTER_BOOST_MAX: 0.22,
@@ -113,6 +118,9 @@ window.APP_CONFIG = {
       "미사", "하남", "파주", "김포", "일산", "산본", "동탄", "광주", "이천", "여주",
       "양평", "의정부", "구리", "남양주", "시흥시", "안산", "수원", "용인", "오산", "평택"
     ],
+    REGIONAL_CITY_KEYWORDS: [
+      "인천", "부산", "대구", "광주", "대전", "울산", "세종"
+    ],
     COMMERCIAL_CORRIDOR_KEYWORDS: [
       "시흥대로", "구로", "가산", "디지털단지", "관악", "금천", "독산", "문래", "영등포",
       "신도림", "여의도", "목동", "하남", "미사", "강변", "테크노", "역세권"
@@ -127,6 +135,8 @@ window.APP_CONFIG = {
       AREA_FLOOR_PY: 120,
       PARKING_BONUS_HNB_CORRIDOR: 0.08,
       PARKING_BONUS_DEFAULT: 0.15,
+      PARKING_PER_LEASE_PY: 0.5,
+      PARKING_SCORE_CAP: 60,
       PARKING_PENALTY_HNB_CORRIDOR: 0.02,
       PARKING_PENALTY_DEFAULT: 0.05
     },
