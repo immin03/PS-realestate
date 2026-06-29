@@ -1,5 +1,5 @@
 window.APP_CONFIG = {
-  HB_KEYWORDS: ["올리브영", "다이소", "롭스", "왓슨스", "부츠"],
+  HB_KEYWORDS: ["올리브영", "다이소", "롭스", "왓슨스", "부츠"], // 지도·참고 표시용 (경쟁 점수 페널티 거의 없음)
   WAREHOUSE_PHARMACY_NAMES: [],
   WEIGHTS: { demand: 25, traffic: 20, competition: 20, economics: 20, physical: 15 },
   BENCHMARK_RENT_PER_PY: 9.0,
@@ -31,8 +31,29 @@ window.APP_CONFIG = {
       SUBWAY_IDEAL_M: 400,
       SUBWAY_GOOD_M: 1200,
       MART_IDEAL_M: 800,
-      MART_GOOD_M: 2500
+      MART_GOOD_M: 2500,
+      FOOT_TRAFFIC_DEMAND_BLEND: 0.38,
+      TOURISM_TRAFFIC_BOOST: 0.22
     },
+    COMPETITION: {
+      HNB_HIGH_THRESHOLD: 18,
+      HNB_PENALTY_PER_STORE: 0.003,
+      HNB_PENALTY_CAP: 0.05,
+      PREMIUM_VITALITY_MIN: 0.4,
+      PREMIUM_SCORE_FLOOR: 0.48,
+      PREMIUM_SCORE_FLOOR_BOOST: 0.32,
+      HUB_PHARMACY_SWEET_MIN: 3,
+      HUB_PHARMACY_SWEET_MAX: 30,
+      HUB_PHARMACY_BONUS: 0.09,
+      RETAIL_ECOSYSTEM_HNB_MIN: 5,
+      RETAIL_ECOSYSTEM_BONUS: 0.07,
+      SYNERGY_BONUS_MAX: 4
+    },
+    PREMIUM_DISTRICT_KEYWORDS: [
+      "성수", "명동", "강남", "신사", "홍대", "이태원", "압구정", "청담", "가로수",
+      "역삼", "을지로", "동대문", "한남", "삼성", "잠실", "여의도", "선릉", "논현",
+      "건대", "왕십리", "광화문", "종로", "서울역", "코엑스", "판교", "분당"
+    ],
     PHYSICAL: {
       AREA_IDEAL_PY: 200,
       AREA_MIN_PY: 150,
