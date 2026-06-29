@@ -908,7 +908,7 @@ function renderCompetition(rk){
     $("warehouseStoresBox").style.display = "none";
   }
 
-  if (!CONFIG.KAKAO_JS_KEY) drawMockMap(rk, c);
+  if (!kakaoSdkReady) drawMockMap(rk, c);
   else drawKakaoMap(rk);
 }
 function drawMockMap(rk, c){
@@ -938,8 +938,10 @@ function drawMockMap(rk, c){
 let kakaoMapObj = null;
 let kakaoSdkPromise = null;
 
+let kakaoSdkReady = false;
+
 function loadKakaoSDK() {
-  if (window.kakao && window.kakao.maps) return Promise.resolve();
+  if (kakaoSdkReady && window.kakao && window.kakao.maps) return Promise.resolve();
   if (kakaoSdkPromise) return kakaoSdkPromise;
 
   kakaoSdkPromise = new Promise((resolve, reject) => {
@@ -962,7 +964,7 @@ function loadKakaoSDK() {
     const timer = setTimeout(() => {
       finish(() => {
         kakaoSdkPromise = null;
-        reject(new Error("카카오 지도 SDK 로드 시간이 초과되었습니다. 카카오 개발자 콘솔에 현재 사이트 도메인(예: http://localhost:8888)이 등록되어 있는지 확인해 주세요."));
+        reject(new Error("카카오 지도 SDK 로드 시간이 초과되었습니다. Web 플랫폼에 https://ps-realestate.netlify.app 이 JavaScript 키와 같은 앱에 등록됐는지 확인해 주세요."));
       });
     }, timeoutMs);
 
@@ -970,15 +972,41 @@ function loadKakaoSDK() {
       if (!window.kakao || !kakao.maps) {
         finish(() => {
           kakaoSdkPromise = null;
-          reject(new Error("카카오 지도 SDK를 초기화하지 못했습니다."));
+          reject(new Error("카카오 지도 SDK를 초기화하지 못했습니다. JavaScript 키와 Web 도메인이 같은 카카오 앱에 설정됐는지 확인해 주세요."));
         });
         return;
       }
-      kakao.maps.load(() => finish(resolve));
+
+      let loadDone = false;
+      const loadTimer = setTimeout(() => {
+        if (loadDone) return;
+        finish(() => {
+          kakaoSdkPromise = null;
+          reject(new Error("카카오 지도 SDK 초기화가 완료되지 않았습니다. Web 도메인 등록 후 1~2분 뒤 다시 시도해 주세요."));
+        });
+      }, timeoutMs);
+
+      kakao.maps.load(() => {
+        loadDone = true;
+        clearTimeout(loadTimer);
+        kakaoSdkReady = true;
+        finish(resolve);
+      });
     };
 
     const existing = document.querySelector('script[data-kakao-sdk="1"]');
     if (existing) {
+      if (window.kakao && window.kakao.maps) {
+        onReady();
+        return;
+      }
+      if (existing.readyState === "complete" || existing.readyState === "loaded") {
+        finish(() => {
+          kakaoSdkPromise = null;
+          reject(new Error("카카오 지도 SDK 스크립트는 로드됐지만 초기화되지 않았습니다. Web 도메인과 JavaScript 키 앱이 일치하는지 확인해 주세요."));
+        });
+        return;
+      }
       existing.addEventListener("load", onReady, { once: true });
       existing.addEventListener("error", () => finish(() => {
         kakaoSdkPromise = null;
@@ -1118,6 +1146,26 @@ function geocodeAddress(keyword, timeoutMs = 8000) {
       }
     });
   });
+}
+
+async function geocodeViaRestApi(addr) {
+  const data = await callFunctionApi("geocode", { query: addr }, "주소 좌표 변환");
+  const first = data.first;
+  if (!first) {
+    throw new Error("주소를 찾을 수 없습니다. 지번 또는 도로명 주소로 다시 입력해 주세요.");
+  }
+  return first;
+}
+
+async function resolveInputAddress(addr) {
+  if (kakaoSdkReady && window.kakao && window.kakao.maps && window.kakao.maps.services) {
+    try {
+      return await geocodeInputAddress(addr);
+    } catch (error) {
+      console.warn("Kakao JS geocoder failed, falling back to REST:", error);
+    }
+  }
+  return geocodeViaRestApi(addr);
 }
 
 function geocodeInputAddress(addr, timeoutMs = 12000) {
@@ -2445,16 +2493,17 @@ $("runBtn").addEventListener("click", async ()=>{
   $("runBtn").disabled = true;
 
   try {
-    if (!CONFIG.KAKAO_JS_KEY) {
-      alert("카카오 JavaScript 키가 설정되지 않았습니다. CONFIG.KAKAO_JS_KEY를 확인해 주세요.");
-      return;
+    if (CONFIG.KAKAO_JS_KEY) {
+      setAnalysisStatus("지도 SDK 로드 중...");
+      try {
+        await loadKakaoSDK();
+      } catch (sdkError) {
+        console.warn("Kakao map SDK unavailable, continuing with REST geocoding:", sdkError);
+      }
     }
 
-    setAnalysisStatus("지도 SDK 로드 중...");
-    await loadKakaoSDK();
-
     setAnalysisStatus("주소 좌표 변환 중...");
-    const kakaoResult = await geocodeInputAddress(addr);
+    const kakaoResult = await resolveInputAddress(addr);
     await runPublicDataAnalysis(kakaoResult);
   } catch (error) {
     console.error(error);
