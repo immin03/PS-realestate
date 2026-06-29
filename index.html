@@ -35,19 +35,17 @@
           padding:56px 64px 48px; }
   @media (max-width:720px){ .sheet{ padding:32px 20px; } }
 
-  .letterhead{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px; }
-  .wordmark{ font-weight:700; letter-spacing:0.42em; font-size:17px; }
-  .logo-img{ display:block; width:200px; max-width:100%; height:auto; object-fit:contain; object-position:center; }
-  .logo-img.gate{ width:min(240px, 72vw); }
-  .logo-img.letter{ width:min(200px, 48vw); }
-  .logo-img.footer{ width:min(168px, 40vw); }
-  .logo-badge{ background:#fff; display:inline-flex; align-items:center; justify-content:center; border-radius:8px; box-sizing:border-box; flex-shrink:0; line-height:0; overflow:hidden; }
-  .logo-badge.gate{ padding:14px 24px; max-width:calc(100% - 24px); }
-  .logo-badge.letter{ padding:10px 16px; border:1px solid var(--hairline); }
-  .logo-badge.footer{ padding:8px 14px; border:1px solid var(--hairline); }
+  .letterhead{ display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:8px; }
+  .brand-bar{ background:#0a0a0a; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; line-height:0; flex-shrink:0; }
+  .brand-bar.letter{ padding:10px 18px; }
+  .brand-bar.footer{ padding:6px 14px; border-radius:4px; }
+  .brand-logo{ display:block; height:auto; object-fit:contain; object-position:center; }
+  .brand-logo.gate{ width:min(148px, 42vw); }
+  .brand-logo.header{ width:min(200px, 46vw); }
+  .brand-logo.footer{ width:min(128px, 34vw); }
   .gate-overlay{ position:fixed; inset:0; background:var(--wash); z-index:999; display:flex; align-items:center; justify-content:center; padding:24px 16px; }
-  .gate-card{ max-width:420px; width:100%; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 16px 48px rgba(0,0,0,0.1); background:var(--paper); }
-  .gate-card-head{ background:linear-gradient(180deg,#1a1a1a 0%,#0f0f0f 100%); padding:40px 28px 32px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:14px; }
+  .gate-card{ max-width:400px; width:100%; border-radius:14px; overflow:hidden; border:1px solid var(--hairline); box-shadow:0 16px 48px rgba(0,0,0,0.1); background:var(--paper); }
+  .gate-card-head{ background:#0a0a0a; padding:44px 32px 36px; text-align:center; display:flex; flex-direction:column; align-items:center; gap:16px; }
   .gate-card-body{ padding:36px 32px 44px; text-align:center; }
   .confidential.light{ color:rgba(255,255,255,0.55); font-size:11.5px; letter-spacing:0.02em; }
   .gate-lead{ font-size:14px; color:#444; margin:0 0 20px; line-height:1.7; }
@@ -250,9 +248,7 @@ const TYPE_PROFILES = {
 <div id="gate" class="gate-overlay">
   <div class="gate-card">
     <div class="gate-card-head">
-      <div class="logo-badge gate">
-        <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img gate">
-      </div>
+      <img src="assets/logo-gate.png" alt="PHAMA SQUARE" class="brand-logo gate">
       <div class="confidential light">Strictly Private &amp; Confidential</div>
     </div>
     <div class="gate-card-body">
@@ -324,8 +320,8 @@ const TYPE_PROFILES = {
 <div class="sheet" id="report">
 
   <div class="letterhead">
-    <div class="logo-badge letter">
-      <img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img letter">
+    <div class="brand-bar letter">
+      <img src="assets/logo-header.png" alt="PHAMA SQUARE" class="brand-logo header">
     </div>
     <div class="confidential">Strictly Private &amp; Confidential</div>
   </div>
@@ -464,7 +460,7 @@ const TYPE_PROFILES = {
     본 자료는 파마스퀘어 사업 모델 관련 사업 협력 검토 목적의 참고자료로서 작성되었으며, 제공된 내용은 현재 시점에서의 가정, 시장 환경, 내부 분석 및 제한된 정보에 기반하여 작성되었습니다.
     본 자료에 포함된 수치는 추정치로서 실제 운영 환경, 입지 조건, 시장 상황 등에 따라 상당한 차이가 발생할 수 있으며, 특정 성과 또는 수익을 보장하지 않습니다.
     본 자료에 포함된 모든 정보는 기밀 정보로서 사전 서면 동의 없이 제3자에게 제공, 복제 또는 공개될 수 없습니다.
-    <div class="ftr-row"><div class="logo-badge footer"><img src="assets/phama-square-logo.png" alt="PHAMA SQUARE" class="logo-img footer"></div><span id="ftrDate">—</span></div>
+    <div class="ftr-row"><div class="brand-bar footer"><img src="assets/logo-footer.png" alt="PHAMA SQUARE" class="brand-logo footer"></div><span id="ftrDate">—</span></div>
   </div>
 </div>
 
