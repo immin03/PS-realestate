@@ -161,6 +161,13 @@
     display:inline-block; margin-right:6px; padding:2px 8px; border-radius:4px;
     background:#e8f5f0; color:var(--ok); font-size:11px; font-weight:700; letter-spacing:0.02em;
   }
+  .scenario-note.warn{
+    margin-top:10px; background:#fff9f3; border-color:#e5cbb0; color:#5c4a38;
+  }
+  .scenario-note .tag-warn{
+    display:inline-block; margin-right:6px; padding:2px 8px; border-radius:4px;
+    background:#fde8d8; color:var(--warn); font-size:11px; font-weight:700; letter-spacing:0.02em;
+  }
 
   /* ===== Report sheet ===== */
   .sheet{ max-width:var(--page-max); width:calc(100% - 2 * var(--page-pad)); margin:16px auto 60px; background:var(--paper); border:1px solid var(--hairline);
@@ -381,6 +388,10 @@
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
+    .scenario-note.warn{
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
     section{ margin-top:28px; }
     .map-head{
       page-break-after:avoid; break-after:avoid;
@@ -459,13 +470,13 @@ const TYPE_PROFILES = {
       <div class="wordmark light gate">PHAMA SQUARE</div>
       <div class="gate-product-title title-with-beta">출점 입지 분석 리포트<span class="beta-badge" aria-label="베타 버전">BETA</span></div>
       <div class="confidential light">Strictly Private &amp; Confidential</div>
-    </div>
+  </div>
     <div class="gate-card-body">
       <p class="gate-lead">본 리포트는 관계자 전용 자료입니다.<br>전달받으신 접속 코드를 입력해 주세요.</p>
       <input type="text" id="gateInput" class="gate-input" placeholder="접속 코드" autocomplete="off" autocapitalize="characters" spellcheck="false" inputmode="text">
       <button class="btn gate-btn" id="gateBtn" type="button">확인</button>
       <p id="gateErr">접속 코드가 올바르지 않습니다. 대소문자 구분 없이 다시 입력해 주세요.</p>
-    </div>
+</div>
   </div>
 </div>
 <script>
@@ -525,7 +536,7 @@ const TYPE_PROFILES = {
       <input type="text" id="addrInput" value="" placeholder="도로명·지번 주소 검색 (예: 서울 관악구 시흥대로 554)" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="addrSuggest" aria-expanded="false">
       <div id="addrSuggest" class="addr-suggest" role="listbox" aria-label="주소 검색 결과"></div>
     </div>
-    <button class="btn" id="runBtn">분석</button>
+  <button class="btn" id="runBtn">분석</button>
   </div>
   <div class="toolbar-row toolbar-row-options">
   <div class="store-model" title="출점 검토 기준을 선택합니다">
@@ -537,7 +548,7 @@ const TYPE_PROFILES = {
     <button id="modeExternal">가맹점주 제공용</button>
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
-  </div>
+</div>
   </div>
 <div class="site-detail-bar" id="siteDetailBar">
   <div class="site-detail-head">
@@ -704,8 +715,9 @@ const TYPE_PROFILES = {
     <div class="sec-title direct-tone">상가 시세 — 실거래가 기준</div>
     <div class="sec-title franchise-tone">상권 시세 · 임대 전망</div>
     <div class="sec-lead direct-tone">국토교통부 실거래 신고가 기준, 대상지 반경 <b>2km</b> 이내 상업업무용 실거래 참고 사례입니다. 호가가 아닌 실거래만 표기합니다.</div>
-    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — 도심형 180평 표준 손익을 입력 평수·상권에 맞게 환산합니다. <b>매출·영업이익은 확정값이 아닌 Conservative~Normal 예상 구간</b>으로 표기합니다(임대료 0원 전제).</div>
+    <div class="sec-lead franchise-tone">건물주 보유 상가 기준 — 도심형 180평 표준 손익을 입지·평수에 맞게 <b>모델 가정</b>으로 환산합니다. 매출·영업이익·임대 대비 배율은 <b>확정값이 아닌 Conservative~Normal 예상 구간</b>이며(임대료 0원 전제), 실제 결과를 보장하지 않습니다.</div>
     <div class="scenario-note franchise-tone" id="franchiseScenarioNote"></div>
+    <div class="scenario-note warn franchise-tone" id="franchiseEconDisclaimer" style="display:none;"></div>
     <div class="grid franchise-tone" style="margin-bottom:16px;" id="franchiseEconGrid"></div>
     <div class="grid" style="margin-bottom:16px;" id="priceGrid"></div>
     <table class="tbl">
@@ -1823,7 +1835,8 @@ function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
 
   const baseSales = cfg.MONTHLY_SETTLED_SALES || 17531;
   const grossRatio = cfg.GROSS_CONTRIB_RATIO || (7952 / 17531);
-  const monthlySales = baseSales * Math.pow(areaScale, 0.93) * locMult;
+  const conservativeFactor = cfg.CONSERVATIVE_SALES_FACTOR ?? 1;
+  const monthlySales = baseSales * Math.pow(areaScale, 0.93) * locMult * conservativeFactor;
   const monthlyGrossContrib = monthlySales * grossRatio;
 
   const maintenance = (cfg.MAINTENANCE_PER_PY || 2.4) * py;
@@ -1836,7 +1849,9 @@ function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
   const salesPerPy = monthlySales / py;
   const opProfitPerPy = monthlyOpProfit / py;
   const marketRentPy = price?.rentPerPy > 0 ? price.rentPerPy : CONFIG.BENCHMARK_RENT_PER_PY;
-  const leasingIncome = marketRentPy * py;
+  const rentComparePy = Math.max(marketRentPy, cfg.MIN_RENT_COMPARE_PY || 6);
+  const leasingIncomeActual = marketRentPy * py;
+  const leasingIncome = rentComparePy * py;
   const profitVsRentRatio = leasingIncome > 0 ? monthlyOpProfit / leasingIncome : null;
   const normalUplift = cfg.NORMAL_SCENARIO_UPLIFT || 1.25;
 
@@ -1856,6 +1871,8 @@ function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
     opProfitPerPy: Math.round(opProfitPerPy * 10) / 10,
     opProfitPerPyNormal: Math.round((opProfitPerPy * normalUplift) * 10) / 10,
     marketRentPy,
+    rentComparePy,
+    leasingIncomeActual: Math.round(leasingIncomeActual),
     leasingIncome: Math.round(leasingIncome),
     profitVsRentRatio: profitVsRentRatio != null ? Math.round(profitVsRentRatio * 100) / 100 : null,
     profitVsRentRatioNormal: profitVsRentRatio != null
@@ -2640,8 +2657,8 @@ function render(){
            ? `보조 상권(활성도 ${vitalityPct}점) — 유동 데이터 기준으로 명동·강남 중심과 구분해 평가합니다.`
            : `핵심 상권(활성도 ${vitalityPct}점) — 관광·집객 POI와 함께 상권이 작동 중이나, 약국 ${c1.pharmacies}개소는 경쟁 요인으로 별도 관리합니다.`
          : c5.pharmacies <= 50
-           ? "광역 기준 과밀 수준은 아닙니다."
-           : "광역 밀집도가 높습니다. 규모·구색 차별화가 전제되어야 합니다."],
+       ? "광역 기준 과밀 수준은 아닙니다."
+       : "광역 밀집도가 높습니다. 규모·구색 차별화가 전제되어야 합니다."],
     [isPremiumHub ? "ok" : (c2.hnb <= 12 ? "ok" : "cond"),
      `H&B·뷰티 — 2km 내 ${c2.hnb}개소 (1km ${c1.hnb}개소)`,
      isPremiumHub
@@ -2702,7 +2719,7 @@ function render(){
               ? `실거래 ${p.deals12mo}건 — 시세 참고 제한적. 공실·호가 현장 확인 필요.`
               : "인근 실거래 부족 — 공실·임대 전망은 현장 조사 전제입니다.")
          : (rentGapPct == null
-            ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
+       ? "인근 상업용 매매 실거래가 없어 임대료를 추정하지 못했습니다. 경제성은 보수적으로 평가됩니다."
             : `${d.price.rentSource || "인근 실거래 기반 추정"}. 표준 손익 모델(${CONFIG.BENCHMARK_RENT_PER_PY}만원/평) 대비 ${rentGapPct <= 0 ? "이내" : `약 ${rentGapPct}% 높음`}.`)],
   ];
   const marks = { ok:"●", cond:"◐", no:"○" };
@@ -2773,21 +2790,35 @@ function render(){
     const upliftPct = Math.round((u.normalUplift || 1.25) * 100 - 100);
     $("franchiseScenarioNote").innerHTML =
       `<span class="tag">예상 구간</span>` +
-      `아래 매출·영업이익은 <b>확정 수치가 아닌 예상 범위</b>입니다. ` +
+      `아래 매출·영업이익은 <b>확정 수치가 아닌 모델 가정</b>에 따른 예상 범위입니다. ` +
       `<b>Conservative(보수)</b>~<b>Normal(기대)</b> 사이로 표기하며, Normal은 Conservative 대비 약 <b>${upliftPct}%</b> 상회 가정입니다. ` +
       `종합 점수·등급은 보수(Conservative) 기준으로 산정합니다.`;
+    const disclaimer = $("franchiseEconDisclaimer");
+    if (disclaimer) {
+      disclaimer.style.display = "block";
+      const rentNote = u.marketRentPy < u.rentComparePy
+        ? ` 인근 임대시세(${u.marketRentPy}만원/평)가 낮을 경우 배율이 부풀려질 수 있어, 임대 대비 비교에는 최소 <b>${u.rentComparePy}만원/평</b>을 적용했습니다.`
+        : "";
+      disclaimer.innerHTML =
+        `<span class="tag-warn">가정·면책</span>` +
+        `본 손익은 본사 표준 모델을 입지·평수에 환산한 <b>시뮬레이션</b>이며, 실제 매출·영업이익·임대수익 대비 배율을 <b>보장·권유하지 않습니다</b>. ` +
+        `건물주 직접운영(임대료 0원) 전제이고, 인허가·인테리어·초기 적자·운영 역량 등은 반영되지 않았습니다.${rentNote}`;
+    }
+    const rentRatioDesc = u.marketRentPy < u.rentComparePy
+      ? `비교 임대 ${u.rentComparePy}만원/평 적용(인근 ${u.marketRentPy}만원/평) · 월 ${formatManwon(u.leasingIncome)} 대비 이익`
+      : `공실 임대 추정 ${formatManwon(u.leasingIncome)} 대비 직접운영 이익`;
     $("franchiseEconGrid").innerHTML = [
       ["분석 면적", `${u.areaPy}평`, "입력값 우선 · 미입력 시 건축물대장 추정", true],
-      ["월 매출(예상)", formatManwonRange(u.monthlySales, u.monthlySalesNormal), "Conservative~Normal 구간 · 정산매출(매장+전대)", false],
-      ["평당 월매출(예상)", formatPerPyRange(u.salesPerPy, u.salesPerPyNormal), "Conservative~Normal 구간", false],
-      ["월 영업이익(예상)", formatManwonRange(u.monthlyOpProfit, u.monthlyOpProfitNormal), "임대료 0원(건물주 보유) · 관리비·인건비·로열티 반영", true],
-      ["평당 영업이익(예상)", formatPerPyRange(u.opProfitPerPy, u.opProfitPerPyNormal), "Conservative~Normal 구간", false],
+      ["월 매출(예상)", formatManwonRange(u.monthlySales, u.monthlySalesNormal), "모델 가정 · Conservative~Normal · 정산매출(매장+전대)", false],
+      ["평당 월매출(예상)", formatPerPyRange(u.salesPerPy, u.salesPerPyNormal), "모델 가정 · Conservative~Normal 구간", false],
+      ["월 영업이익(예상)", formatManwonRange(u.monthlyOpProfit, u.monthlyOpProfitNormal), "모델 가정 · 임대료 0원(건물주) · 관리비·인건비·로열티", true],
+      ["평당 영업이익(예상)", formatPerPyRange(u.opProfitPerPy, u.opProfitPerPyNormal), "모델 가정 · Conservative~Normal 구간", false],
       ["인근 임대 시세", `${u.marketRentPy}만원/평`, u.marketRentSource, false],
-      ["임대 대비 수익(예상)", formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal),
-        `공실 시 임대 ${formatManwon(u.leasingIncome)} 대비 직접운영 이익 구간`, true]
+      ["임대 대비 수익(예상)", formatRatioRange(u.profitVsRentRatio, u.profitVsRentRatioNormal), rentRatioDesc, true]
     ].map(m => `<div class="metric"><div class="l">${m[0]}</div><div class="v">${m[1]}</div><div class="d">${m[2]}</div></div>`).join("");
   } else {
     if ($("franchiseScenarioNote")) $("franchiseScenarioNote").innerHTML = "";
+    if ($("franchiseEconDisclaimer")) $("franchiseEconDisclaimer").style.display = "none";
     if ($("franchiseEconGrid")) $("franchiseEconGrid").innerHTML = "";
   }
   $("priceGrid").innerHTML = [
@@ -3383,7 +3414,7 @@ function parseJibunFromAddress(addressName) {
   }
   const tail = s.match(/(\d+)(?:\s*-\s*(\d+))?\s*$/);
   if (tail) {
-    return {
+  return {
       bun: tail[1].padStart(4, "0"),
       ji: (tail[2] || "0").padStart(4, "0")
     };
@@ -4652,13 +4683,13 @@ function classifyWarehousePharmacy(place, brands) {
   for (const token of db.nameContains || []) {
     if (!text.includes(normalizePlaceText(token))) continue;
     if (isAmbiguousWarehouseToken(token, db) && !hasPharmacyContext(text, category)) continue;
-    return { isWarehouse: true, matchReason: `상호·카테고리 키워드: ${token}` };
+      return { isWarehouse: true, matchReason: `상호·카테고리 키워드: ${token}` };
   }
 
   for (const pattern of db.namePatterns || []) {
     if (!text.includes(normalizePlaceText(pattern))) continue;
     if (isAmbiguousWarehouseToken(pattern, db) && !hasPharmacyContext(text, category)) continue;
-    return { isWarehouse: true, matchReason: `패턴 매칭: ${pattern}` };
+      return { isWarehouse: true, matchReason: `패턴 매칭: ${pattern}` };
   }
 
   for (const legacy of CONFIG.WAREHOUSE_PHARMACY_NAMES || []) {
