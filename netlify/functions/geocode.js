@@ -22,7 +22,7 @@ exports.handler = async function (event) {
   const url =
     "https://dapi.kakao.com/v2/local/search/address.json" +
     `?query=${encodeURIComponent(query)}` +
-    "&size=5";
+    "&size=10";
 
   try {
     const res = await fetchWithTimeout(

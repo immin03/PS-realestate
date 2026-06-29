@@ -16,12 +16,38 @@
         font-size:14px; line-height:1.6; -webkit-font-smoothing:antialiased; }
 
   /* ===== Toolbar (screen only) ===== */
-  .toolbar{ max-width:900px; margin:0 auto; padding:20px 16px 0; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-  .toolbar input[type=text]{ flex:1; min-width:200px; height:42px; border:1px solid var(--hairline); border-radius:8px;
-        padding:0 14px; font-size:14px; font-family:inherit; background:var(--paper); }
-  .toolbar input[type=text]:focus{ outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(17,17,17,0.06); }
-  .toolbar .search-group{ display:flex; flex:1; min-width:min(100%, 280px); gap:8px; align-items:stretch; }
-  .toolbar .search-group input[type=text]{ flex:1; min-width:0; }
+  .toolbar{
+    max-width:1100px; margin:0 auto; padding:20px 16px 0;
+    display:flex; flex-direction:column; gap:10px; align-items:stretch;
+  }
+  .toolbar-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .toolbar-row-address{ width:100%; }
+  .toolbar-row-options{ width:100%; }
+  .addr-field-wrap{ position:relative; flex:1; min-width:min(100%, 420px); }
+  #addrInput{
+    width:100%; height:44px; border:1px solid var(--hairline); border-radius:8px;
+    padding:0 14px; font-size:14px; font-family:inherit; background:var(--paper);
+  }
+  #addrInput:focus{ outline:none; border-color:var(--ink); box-shadow:0 0 0 3px rgba(17,17,17,0.06); }
+  #addrInput::placeholder{ color:#b0b0b0; }
+  .addr-suggest{
+    display:none; position:absolute; top:calc(100% + 4px); left:0; right:0; z-index:200;
+    background:var(--paper); border:1px solid var(--hairline); border-radius:8px;
+    max-height:280px; overflow-y:auto; box-shadow:0 10px 28px rgba(17,17,17,0.1);
+  }
+  .addr-suggest.open{ display:block; }
+  .addr-suggest-item{
+    width:100%; text-align:left; border:none; background:transparent;
+    padding:11px 14px; cursor:pointer; font-family:inherit; font-size:13px; line-height:1.45;
+    border-bottom:1px solid var(--hairline); color:var(--ink);
+  }
+  .addr-suggest-item:last-child{ border-bottom:none; }
+  .addr-suggest-item:hover, .addr-suggest-item.active{ background:var(--wash); }
+  .addr-suggest-item .sub{ display:block; margin-top:2px; font-size:11px; color:var(--gray); }
+  .addr-suggest-empty{
+    padding:12px 14px; font-size:12px; color:var(--gray);
+  }
+  .toolbar .search-group{ display:flex; flex:1; min-width:0; gap:8px; align-items:stretch; flex-wrap:wrap; }
   .area-field{
     display:flex; align-items:center; height:42px; flex:0 0 auto;
     border:1px solid var(--hairline); border-radius:8px; background:var(--paper);
@@ -42,11 +68,14 @@
     user-select:none; white-space:nowrap;
   }
   @media (max-width:560px){
+    .toolbar-row-address{ flex-direction:column; align-items:stretch; }
+    .toolbar-row-address .btn{ width:100%; }
+    .addr-field-wrap{ min-width:100%; }
     .toolbar .search-group{ flex:1 1 100%; min-width:100%; }
     .area-field{ flex:0 0 96px; }
   }
   .lease-floor-bar{
-    max-width:900px; margin:10px auto 0; padding:0 16px;
+    max-width:1100px; margin:10px auto 0; padding:0 16px;
     display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px;
   }
   .lease-floor-label{
@@ -75,7 +104,7 @@
   .store-model button.on{ background:var(--teal); color:#fff; }
   body:not(.store-franchise) .sec-lead-franchise, body:not(.store-franchise) .franchise-tone{ display:none !important; }
   body.store-franchise .sec-lead-direct, body.store-franchise .direct-tone{ display:none !important; }
-  .demo-note{ max-width:900px; margin:8px auto 0; padding:0 16px; font-size:12px; color:var(--gray); }
+  .demo-note{ max-width:1100px; margin:8px auto 0; padding:0 16px; font-size:12px; color:var(--gray); }
   .demo-note b{ color:var(--red); font-weight:600; }
   .scenario-note{
     margin-bottom:14px; padding:12px 16px; border-radius:8px;
@@ -109,7 +138,7 @@
   .gate-btn{ width:100%; margin-top:14px; height:48px; font-size:15px; }
   #gateErr{ font-size:12px; color:var(--red); margin-top:12px; min-height:18px; line-height:1.5; visibility:hidden; }
   #gateErr.show{ visibility:visible; }
-  .recent-searches{ max-width:900px; margin:6px auto 0; padding:0 16px; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
+  .recent-searches{ max-width:1100px; margin:6px auto 0; padding:0 16px; display:none; gap:6px; flex-wrap:wrap; align-items:center; }
   .recent-searches .lbl{ font-size:12px; color:var(--gray); flex-shrink:0; }
   .recent-searches button{ border:1px solid var(--hairline); background:var(--paper); border-radius:999px; padding:5px 12px; font-size:12px; cursor:pointer; font-family:inherit; color:#444; max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .recent-searches button:hover{ border-color:var(--ink); color:var(--ink); }
@@ -359,8 +388,15 @@ const TYPE_PROFILES = {
 </script>
 
 <div class="toolbar">
-  <div class="search-group">
-    <input type="text" id="addrInput" value="" placeholder="주소 입력 (도로명·지번)">
+  <div class="toolbar-row toolbar-row-address">
+    <div class="addr-field-wrap">
+      <input type="text" id="addrInput" value="" placeholder="도로명·지번 주소 검색 (예: 서울 관악구 시흥대로 554)" autocomplete="off" spellcheck="false" aria-autocomplete="list" aria-controls="addrSuggest" aria-expanded="false">
+      <div id="addrSuggest" class="addr-suggest" role="listbox" aria-label="주소 검색 결과"></div>
+    </div>
+    <button class="btn" id="runBtn">분석</button>
+  </div>
+  <div class="toolbar-row toolbar-row-options">
+    <div class="search-group">
     <label class="area-field" title="임대 전용면적(평) — 가맹(건물주) 손익 산정용">
       <input type="number" id="areaInput" min="80" max="500" step="1" placeholder="180" inputmode="numeric" aria-label="면적(평)">
       <span class="area-suffix">평</span>
@@ -372,8 +408,7 @@ const TYPE_PROFILES = {
     <label class="area-field" title="주차 대수 — 건축물대장 미등록 시 입력">
       <input type="number" id="parkingInput" min="0" max="999" step="1" placeholder="주차" inputmode="numeric" aria-label="주차 대수">
     </label>
-  </div>
-  <button class="btn" id="runBtn">분석</button>
+    </div>
   <div class="store-model" title="출점 검토 기준을 선택합니다">
     <button id="storeDirect" class="on">직영 출점</button>
     <button id="storeFranchise">가맹 출점</button>
@@ -383,13 +418,14 @@ const TYPE_PROFILES = {
     <button id="modeExternal">가맹점주 제공용</button>
   </div>
   <button class="btn ghost" onclick="window.print()">인쇄 / PDF</button>
+  </div>
 </div>
 <div class="lease-floor-bar" id="leaseFloorBar">
   <span class="lease-floor-label">출점층</span>
   <div class="floor-chips" id="leaseFloorChips" role="group" aria-label="출점·임대 대상 층 (복수 선택)"></div>
   <span class="lease-floor-hint">복수 선택 가능 · 1층 포함 시 접근성 가산</span>
 </div>
-<p class="demo-note" id="demoNote">주소·<b>평수</b>·<b>출점층·건물층수·주차</b>를 입력한 뒤 <b>분석</b>을 누르세요. 유동·집객력은 실측 유동인구가 아닌 <b>POI·교통 프록시</b>입니다.</p>
+<p class="demo-note" id="demoNote">주소는 <b>도로명·지번 자동완성</b>으로 정확히 선택하세요. 평수·출점층·건물층수·주차 입력 후 <b>분석</b>을 누르세요.</p>
 <div class="recent-searches" id="recentSearches"></div>
 
 <div class="sheet" id="report">
@@ -775,14 +811,57 @@ function computeCommercialClusterBoost(metrics) {
   return Math.min(maxBoost, boost);
 }
 
+function extractParkingFromRegistry(item) {
+  const autoIn = toNumber(item.indrAutoUtcnt);
+  const autoOut = toNumber(item.oudrAutoUtcnt);
+  const mechIn = toNumber(item.indrMechUtcnt);
+  const mechOut = toNumber(item.oudrMechUtcnt);
+  const auto = autoIn + autoOut;
+  const mech = mechIn + mechOut;
+  const total = auto + mech;
+  const detail = [];
+  if (auto > 0) detail.push(`자주식 ${auto}대`);
+  if (mech > 0) detail.push(`기계식 ${mech}대`);
+  return {
+    total,
+    auto,
+    mech,
+    label: total > 0
+      ? `주차 ${total}대 (건축물대장${detail.length ? " · " + detail.join(" · ") : ""})`
+      : null
+  };
+}
+
+function syncParkingInputFromRegistry(total) {
+  const pin = $("parkingInput");
+  if (!pin || total <= 0) return;
+  if (pin.dataset.userTouched === "1") return;
+  pin.value = String(total);
+  pin.dataset.autoFilled = "1";
+}
+
+function resetManualFieldTouchFlags() {
+  const pin = $("parkingInput");
+  const bldg = $("bldgFloorInput");
+  if (pin) delete pin.dataset.userTouched;
+  if (bldg) delete bldg.dataset.userTouched;
+}
+
 function applyBuildingManualOverrides() {
   const parkingCnt = toNumber($("parkingInput")?.value);
-  if (parkingCnt >= 1) {
+  const registryPark = toNumber(DATA.building.parkingRegistry);
+  const parkingTouched = $("parkingInput")?.dataset.userTouched === "1";
+
+  if (registryPark > 0 && !parkingTouched) {
+    DATA.building.parking = DATA.building.parkingRegistryLabel || `주차 ${registryPark}대 (건축물대장 기준)`;
+    DATA.building.parkingManual = false;
+  } else if (parkingCnt >= 1) {
     DATA.building.parking = `주차 ${parkingCnt}대 (현장·입력값)`;
     DATA.building.parkingManual = true;
   }
   const bldgCnt = toNumber($("bldgFloorInput")?.value);
-  if (bldgCnt >= 2) {
+  const bldgTouched = $("bldgFloorInput")?.dataset.userTouched === "1";
+  if (bldgCnt >= 2 && bldgTouched) {
     DATA.building.bldgFloorCnt = bldgCnt;
     DATA.building.bldgFloorLabel = `건물 지상 ${bldgCnt}층${bldgCnt >= 10 ? " · 신축 고층" : ""}`;
     DATA.building.bldgFloorManual = true;
@@ -2599,6 +2678,173 @@ async function geocodeViaRestApi(addr) {
   return first;
 }
 
+function normalizeKakaoAddressItem(doc) {
+  const road = doc.road_address?.address_name
+    || (doc.address_type === "ROAD_ADDR" ? doc.address_name : "");
+  const jibun = doc.address?.address_name
+    || (doc.address_type === "REGION_ADDR" ? doc.address_name : "");
+  const main = road || jibun || doc.address_name || "";
+  const sub = road && jibun && road !== jibun ? `지번 ${jibun}` : "";
+  return { main, sub, source: "kakao", raw: doc };
+}
+
+function normalizeJusoSuggestItem(item) {
+  const main = item.roadAddr || item.jibunAddr || "";
+  const sub = item.roadAddr && item.jibunAddr && item.roadAddr !== item.jibunAddr
+    ? `지번 ${item.jibunAddr}`
+    : (item.zipNo ? `우편번호 ${item.zipNo}` : "");
+  return { main, sub, source: "juso", raw: item };
+}
+
+function searchAddressViaKakaoJs(query) {
+  return new Promise(resolve => {
+    if (!window.kakao?.maps?.services) return resolve([]);
+    const geocoder = new kakao.maps.services.Geocoder();
+    geocoder.addressSearch(query, (res, status) => {
+      if (status === kakao.maps.services.Status.OK && res?.length) resolve(res.slice(0, 8));
+      else resolve([]);
+    });
+  });
+}
+
+async function fetchAddressSuggestions(query) {
+  const q = String(query || "").trim();
+  if (q.length < 2) return [];
+
+  if (kakaoSdkReady && window.kakao?.maps?.services) {
+    const jsItems = await searchAddressViaKakaoJs(q);
+    if (jsItems.length) return jsItems.map(normalizeKakaoAddressItem);
+  }
+
+  try {
+    const data = await callFunctionApi("geocode", { query: q }, "주소 검색", 8000);
+    if (data.items?.length) return data.items.slice(0, 8).map(normalizeKakaoAddressItem);
+  } catch { /* juso fallback */ }
+
+  try {
+    const j = await callFunctionApi("juso", { keyword: q }, "주소 검색", 8000);
+    if (j.items?.length) return j.items.slice(0, 8).map(normalizeJusoSuggestItem);
+  } catch { /* no results */ }
+
+  return [];
+}
+
+const addrSuggestState = { items: [], active: -1, timer: null, seq: 0 };
+
+function hideAddrSuggest() {
+  const box = $("addrSuggest");
+  const input = $("addrInput");
+  if (!box) return;
+  box.classList.remove("open");
+  box.innerHTML = "";
+  addrSuggestState.items = [];
+  addrSuggestState.active = -1;
+  if (input) input.setAttribute("aria-expanded", "false");
+}
+
+function selectAddrSuggestion(index) {
+  const item = addrSuggestState.items[index];
+  if (!item) return;
+  const input = $("addrInput");
+  if (input) input.value = item.main;
+  hideAddrSuggest();
+  input?.focus();
+}
+
+function renderAddrSuggest(items) {
+  const box = $("addrSuggest");
+  const input = $("addrInput");
+  if (!box) return;
+  addrSuggestState.items = items;
+  addrSuggestState.active = items.length ? 0 : -1;
+
+  if (!items.length) {
+    box.innerHTML = `<div class="addr-suggest-empty">검색 결과가 없습니다. 도로명 또는 지번으로 다시 입력해 주세요.</div>`;
+    box.classList.add("open");
+    if (input) input.setAttribute("aria-expanded", "true");
+    return;
+  }
+
+  box.innerHTML = items.map((item, i) =>
+    `<button type="button" class="addr-suggest-item${i === 0 ? " active" : ""}" role="option" data-idx="${i}">` +
+    `${item.main}${item.sub ? `<span class="sub">${item.sub}</span>` : ""}` +
+    `</button>`
+  ).join("");
+
+  box.querySelectorAll(".addr-suggest-item").forEach(btn => {
+    btn.addEventListener("mousedown", e => {
+      e.preventDefault();
+      selectAddrSuggestion(Number(btn.dataset.idx));
+    });
+  });
+
+  box.classList.add("open");
+  if (input) input.setAttribute("aria-expanded", "true");
+}
+
+function setAddrSuggestActive(next) {
+  const box = $("addrSuggest");
+  if (!box || !addrSuggestState.items.length) return;
+  const max = addrSuggestState.items.length - 1;
+  addrSuggestState.active = Math.max(0, Math.min(max, next));
+  box.querySelectorAll(".addr-suggest-item").forEach((el, i) => {
+    el.classList.toggle("active", i === addrSuggestState.active);
+  });
+}
+
+function queueAddrSuggest(query) {
+  clearTimeout(addrSuggestState.timer);
+  const q = String(query || "").trim();
+  if (q.length < 2) {
+    hideAddrSuggest();
+    return;
+  }
+  addrSuggestState.timer = setTimeout(async () => {
+    const seq = ++addrSuggestState.seq;
+    try {
+      const items = await fetchAddressSuggestions(q);
+      if (seq !== addrSuggestState.seq) return;
+      if ($("addrInput")?.value.trim() !== q) return;
+      renderAddrSuggest(items);
+    } catch {
+      if (seq === addrSuggestState.seq) hideAddrSuggest();
+    }
+  }, 280);
+}
+
+function initAddrAutocomplete() {
+  const input = $("addrInput");
+  if (!input) return;
+
+  input.addEventListener("input", () => queueAddrSuggest(input.value));
+  input.addEventListener("focus", () => {
+    if (input.value.trim().length >= 2 && !addrSuggestState.items.length) {
+      queueAddrSuggest(input.value);
+    }
+  });
+  input.addEventListener("blur", () => {
+    setTimeout(hideAddrSuggest, 160);
+  });
+  input.addEventListener("keydown", e => {
+    const box = $("addrSuggest");
+    const open = box?.classList.contains("open");
+    if (e.key === "ArrowDown" && open) {
+      e.preventDefault();
+      setAddrSuggestActive(addrSuggestState.active + 1);
+    } else if (e.key === "ArrowUp" && open) {
+      e.preventDefault();
+      setAddrSuggestActive(addrSuggestState.active - 1);
+    } else if (e.key === "Enter") {
+      if (open && addrSuggestState.active >= 0) {
+        e.preventDefault();
+        selectAddrSuggestion(addrSuggestState.active);
+      }
+    } else if (e.key === "Escape") {
+      hideAddrSuggest();
+    }
+  });
+}
+
 async function resolveInputAddress(addr) {
   if (kakaoSdkReady && window.kakao && window.kakao.maps && window.kakao.maps.services) {
     try {
@@ -2773,12 +3019,18 @@ function applyJusoParams(params, jusoResult) {
 }
 
 function inferBuildingType(item) {
-  const use = String(item.mainPurpsCdNm || item.mainPurpsCd || item.etcPurps || "");
+  const use = String(item.mainPurpsCdNm || item.mainPurpsCd || "");
+  const etc = String(item.etcPurps || "");
   const name = String(item.bldNm || "");
-  const combined = use + name;
-  if (/지식산업|지식형|공장/.test(combined)) return "지식산업센터";
-  // if (/아파트|단지|공동주택|주상복합/.test(combined)) return "아파트 단지내 상가";
-  if (/복합|쇼핑|백화|몰|타워/.test(combined)) return "복합상가";
+  const combined = `${use} ${etc} ${name}`;
+
+  if (/지식산업|지식형|지식산업센터|공장\s*\(\s*지식/.test(combined)) return "지식산업센터";
+  if (/공장/.test(use) && /지식|지원시설/.test(etc)) return "지식산업센터";
+  if (/공장/.test(use) && /지식/.test(name)) return "지식산업센터";
+
+  if (/아파트|단지|공동주택|주상복합/.test(combined)) return "아파트 단지내 상가";
+  if (/복합|쇼핑|백화|몰/.test(combined)) return "복합상가";
+  if (/타워|타운|시티|플라자/.test(name) && !/지식|공장/.test(combined)) return "복합상가";
   if (/근린|상가|판매|소매/.test(combined)) return "근린상가";
   return "근린상가";
 }
@@ -3502,6 +3754,9 @@ function applyBuildingData(buildingResponse) {
   DATA.building.type = inferredType;
 
   if (item.mainPurpsCdNm) DATA.building.mainUse = item.mainPurpsCdNm;
+  if (item.etcPurps && /지식|공장|지원/.test(String(item.etcPurps))) {
+    DATA.building.mainUse = item.etcPurps;
+  }
 
   if (item.useAprDay) {
     DATA.building.approvedYear = Number(String(item.useAprDay).slice(0, 4)) || DATA.building.approvedYear;
@@ -3515,7 +3770,9 @@ function applyBuildingData(buildingResponse) {
     DATA.building.bldgFloorCnt = grndFlrCnt;
     DATA.building.bldgFloorLabel = `건물 지상 ${grndFlrCnt}층${ugrndFlrCnt ? ` / 지하 ${ugrndFlrCnt}층` : ""}`;
     const bldgInp = $("bldgFloorInput");
-    if (bldgInp && !toNumber(bldgInp.value)) bldgInp.value = String(grndFlrCnt);
+    if (bldgInp && bldgInp.dataset.userTouched !== "1") {
+      bldgInp.value = String(grndFlrCnt);
+    }
     buildLeaseFloorChips();
   }
 
@@ -3524,9 +3781,13 @@ function applyBuildingData(buildingResponse) {
     DATA.building.areaPy = Math.round((areaM2 / 3.3058) * 10) / 10;
   }
 
-  const parkingCnt = toNumber(item.indrAutoUtcnt) + toNumber(item.oudrAutoUtcnt);
-  if (parkingCnt > 0) {
-    DATA.building.parking = `주차 ${parkingCnt}대 (건축물대장 기준)`;
+  const park = extractParkingFromRegistry(item);
+  if (park.total > 0) {
+    DATA.building.parkingRegistry = park.total;
+    DATA.building.parkingRegistryLabel = park.label;
+    DATA.building.parking = park.label;
+    DATA.building.parkingManual = false;
+    syncParkingInputFromRegistry(park.total);
   }
 
   if (item.jibunAddr || item.platPlc) {
@@ -3893,6 +4154,7 @@ async function safeApi(label, fn) {
 async function runPublicDataAnalysis(kakaoResult) {
   const addr = $("addrInput").value.trim();
   const errors = [];
+  resetManualFieldTouchFlags();
   let params = getAddressParamsFromKakao(kakaoResult);
 
   DATA.address = params.fullAddress || addr;
@@ -4121,12 +4383,18 @@ function rerenderIfAnalyzed() {
     rerenderIfAnalyzed();
   });
   $(id)?.addEventListener("input", () => {
+    const el = $(id);
+    if (el) el.dataset.userTouched = "1";
     applyBuildingManualOverrides();
   });
 });
 buildLeaseFloorChips();
+initAddrAutocomplete();
 initStoreModel();
-if (CONFIG.KAKAO_JS_KEY) $("demoNote").style.display = "none";
+if (CONFIG.KAKAO_JS_KEY) {
+  $("demoNote").style.display = "none";
+  loadKakaoSDK().catch(() => {});
+}
 renderRecentSearches();
 
 render();
