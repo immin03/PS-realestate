@@ -162,21 +162,34 @@
   .footer .ftr-row{ display:flex; justify-content:space-between; align-items:center; gap:16px; margin-top:10px; font-size:11px; }
   .footer .ftr-row span{ flex-shrink:0; color:var(--gray); }
 
-@page {
-  margin: 14mm 12mm 18mm 12mm;
-  @bottom-center {
-    content: counter(page);
-    font-size: 10px;
-    color: #777;
-  }
-}
+  .print-page-num{ display:none; }
 
   @media print{
+    @page{
+      size:A4;
+      margin:14mm 12mm 22mm 12mm;
+    }
     body{ background:#fff; }
     #gate,.toolbar,.demo-note,.edit-hint,.radius-toggle,.recent-searches{ display:none !important; }
-    .sheet{ border:none; margin:0; max-width:none; padding:24px 8px; }
+    .sheet{ border:none; margin:0; max-width:none; padding:24px 8px 32px; }
     section{ margin-top:28px; }
     #map{ height:300px; }
+    .print-page-num{
+      display:block;
+      position:fixed;
+      bottom:10mm;
+      left:0;
+      right:0;
+      text-align:center;
+      font-size:9pt;
+      color:#888;
+      font-family:"Pretendard",-apple-system,sans-serif;
+      letter-spacing:0.04em;
+      z-index:9999;
+    }
+    .print-page-num::after{
+      content: counter(page) " / " counter(pages);
+    }
   }
 </style>
 <script src="config.js"></script>
@@ -2783,5 +2796,6 @@ renderRecentSearches();
 
 render();
 </script>
+<div class="print-page-num" aria-hidden="true"></div>
 </body>
 </html>
