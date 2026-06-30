@@ -2,6 +2,7 @@ window.APP_CONFIG = {
   HB_KEYWORDS: ["올리브영", "다이소", "롭스", "왓슨스", "부츠"],
   WAREHOUSE_PHARMACY_NAMES: [],
   WEIGHTS: { demand: 25, traffic: 20, competition: 20, economics: 20, physical: 15 },
+  SCORING_ENGINE_VERSION: "v2.1-direct-franchise-econ",
   BENCHMARK_RENT_PER_PY: 9.0,
   FRANCHISE_ECONOMICS: {
     REF_AREA_PY: 180,
@@ -53,18 +54,22 @@ window.APP_CONFIG = {
       FOOT_TRAFFIC_DEMAND_BLEND: 0.38,
       TOURISM_TRAFFIC_BOOST: 0.22,
       SOFT_CORRIDOR_FOOT_CAP: 0.4,
+      SOFT_CORRIDOR_BEAUTY_FOOT_CAP: 0.62,
+      SOFT_CORRIDOR_BEAUTY_TRAFFIC_CAP: 0.78,
       SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP: 0.64,
+      SUBURBAN_DEAD_STRIP_FOOT_CAP: 0.16,
+      SUBURBAN_DEAD_STRIP_TRAFFIC_CAP: 0.36,
       SOFT_CORRIDOR_SUBWAY_WEIGHT: 0.1,
       SOFT_CORRIDOR_DEMAND_FOOT_BLEND: 0.68,
       SOFT_CORRIDOR_DEMAND_HH_WEIGHT: 0.32,
       SUBURBAN_TRAFFIC_CAP: 0.42,
-      SUBURBAN_FOOT_CAP: 0.28,
+      SUBURBAN_FOOT_CAP: 0.22,
       REGIONAL_URBAN_FOOT_CAP: 0.32,
       REGIONAL_URBAN_TRAFFIC_CAP: 0.44,
       REGIONAL_URBAN_DEMAND_HH_WEIGHT: 0.38,
       REGIONAL_URBAN_SALES_LOC_CAP: 0.92,
       REGIONAL_URBAN_VITALITY_CAP: 0.42,
-      CORRIDOR_FOOT_CAP: 0.55,
+      CORRIDOR_FOOT_CAP: 0.68,
       CORRIDOR_TRAFFIC_CAP: 0.72,
       CORRIDOR_CLUSTER_BOOST_MAX: 0.22,
       SUBURBAN_DEMAND_HH_WEIGHT: 0.26,
@@ -106,7 +111,16 @@ window.APP_CONFIG = {
       HOSPITAL_COMP_BONUS_NEAR: 0.05,
       HOSPITAL_COMP_BONUS_MID: 0.025,
       SOFT_CORRIDOR_VITALITY_CAP: 0.34,
-      SOFT_CORRIDOR_STRICT_CAP: 0.28
+      SOFT_CORRIDOR_BEAUTY_VITALITY_CAP: 0.52,
+      SOFT_CORRIDOR_STRICT_CAP: 0.28,
+      WAREHOUSE_VETO_MIN_THREAT: 0.55,
+      WAREHOUSE_THREAT_SCALE: {
+        PREMIUM_HUB: 0.15,
+        MEGA_HUB: 0.12,
+        BEAUTY_RETAIL: 0.25,
+        DENSE_RETAIL: 0.35,
+        VITALITY_DENSE: 0.3
+      }
     },
     MEGA_HUB_KEYWORDS: [
       "명동", "을지로", "광화문", "종로", "동대문", "강남대로", "강남역", "서울역", "잠실", "코엑스", "여의도"
@@ -123,7 +137,7 @@ window.APP_CONFIG = {
     ],
     COMMERCIAL_CORRIDOR_KEYWORDS: [
       "시흥대로", "구로", "가산", "디지털단지", "관악", "금천", "독산", "문래", "영등포",
-      "신도림", "여의도", "목동", "하남", "미사", "강변", "테크노", "역세권"
+      "신도림", "여의도", "목동", "강변", "테크노", "역세권"
     ],
     PREMIUM_DISTRICT_KEYWORDS: [
       "성수", "강남", "홍대", "이태원", "압구정", "청담",
@@ -143,14 +157,35 @@ window.APP_CONFIG = {
     VETO: {
       WAREHOUSE_1KM_MAX_TOTAL: 82,
       NO_PARKING_MAX_TOTAL: 72,
-      RENT_2X_MAX_TOTAL: 78,
+      RENT_2X_MAX_TOTAL: 72,
+      RENT_3X_MAX_TOTAL: 66,
+      RENT_5X_MAX_TOTAL: 58,
+      RENT_UNAFFORDABLE_MAX_TOTAL: 64,
+      FRANCHISE_WEAK_OP_MAX_TOTAL: 78,
       AREA_UNDER_120_MAX_TOTAL: 70
+    },
+    DIRECT_ECONOMICS: {
+      NET_PROFIT_WEIGHT: 0.65,
+      RENT_RATIO_WEIGHT: 0.35,
+      CONSERVATIVE_RENT_MULT: {
+        soft_corridor_beauty: 4.5,
+        premium: 3.5,
+        mega_hub: 4.0,
+        default: 1.1
+      }
     },
     FRANCHISE: {
       MARKET_DEALS_HIGH: 6,
       MARKET_DEALS_MID: 3,
       LEASING_SWEET_MIN: 0.65,
-      LEASING_SWEET_MAX: 1.35
+      LEASING_SWEET_MAX: 1.35,
+      PROFIT_VS_RENT_WEIGHT: 0.55,
+      BIZ_VIABILITY_WEIGHT: 0.22,
+      MARKET_ACTIVITY_WEIGHT: 0.12,
+      LEASING_BAND_WEIGHT: 0.06,
+      OP_RATIO_WEAK_CAP: 0.72,
+      SUBURBAN_LANDLORD_BONUS: 0.06,
+      LARGE_FLOOR_BONUS_PY_MIN: 200
     }
   }
 };

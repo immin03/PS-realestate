@@ -935,6 +935,22 @@ function warehouseThreat(warehouseStores) {
   return Math.min(2.2, threat);
 }
 
+function warehouseThreatScale(context) {
+  const cfg = CONFIG.SCORING?.COMPETITION?.WAREHOUSE_THREAT_SCALE || {};
+  const ctx = context || {};
+  const m = ctx.metrics || {};
+  const zone = m.districtZone || "general";
+  const vitality = ctx.vitality || m.marketVitality || 0;
+  const hnb2 = m.hnb2km || 0;
+
+  if (ctx.isPremiumHub) return cfg.PREMIUM_HUB ?? 0.15;
+  if (zone === "mega_hub") return cfg.MEGA_HUB ?? 0.12;
+  if (zone === "soft_corridor" && detectCorridorBeautyRetail(m)) return cfg.BEAUTY_RETAIL ?? 0.25;
+  if (isUrbanCommercialCorridor(ctx.address || "") && hnb2 >= 5) return cfg.DENSE_RETAIL ?? 0.35;
+  if (vitality >= 0.45 && hnb2 >= 6) return cfg.VITALITY_DENSE ?? 0.3;
+  return 1;
+}
+
 function hasParking(b) {
   const manual = toNumber($("parkingInput")?.value);
   const touched = $("parkingInput")?.dataset.userTouched === "1";
@@ -974,6 +990,8 @@ function getParkingScoreFactor(building) {
 
 function isUrbanCommercialCorridor(address = "") {
   const addr = String(address || "");
+  const suburbanKw = (CONFIG.SCORING?.SUBURBAN_KEYWORDS || []).some(k => addr.includes(k));
+  if (/경기(도)?/.test(addr) && suburbanKw) return false;
   const keys = CONFIG.SCORING?.COMMERCIAL_CORRIDOR_KEYWORDS || [];
   if (keys.some(k => addr.includes(k))) return true;
   if (/서울/.test(addr) && /시흥(대로|동)/.test(addr)) return true;
@@ -1267,8 +1285,10 @@ function classifyAddressZone(address = "") {
   const soft = (CONFIG.SCORING?.SOFT_CORRIDOR_KEYWORDS || []).some(k => addr.includes(k));
   const premium = (CONFIG.SCORING?.PREMIUM_DISTRICT_KEYWORDS || []).some(k => addr.includes(k));
   let suburban = (CONFIG.SCORING?.SUBURBAN_KEYWORDS || []).some(k => addr.includes(k));
-  if (suburban && (isUrbanCommercialCorridor(addr) || /서울/.test(addr))) suburban = false;
+  const isGyeonggiSuburban = suburban && /경기(도)?/.test(addr) && !/서울/.test(addr);
+  if (suburban && !isGyeonggiSuburban && (isUrbanCommercialCorridor(addr) || /서울/.test(addr))) suburban = false;
   if (mega) return "mega_hub";
+  if (isGyeonggiSuburban) return "suburban";
   if (soft && !mega && !/강남대로|강남역/.test(addr)) return "soft_corridor";
   if (premium) return "premium";
   if (suburban) return "suburban";
@@ -1299,6 +1319,19 @@ function detectSuburbanStrip(metrics, address = "") {
   const weakAttraction = tourism < 2 && dept === 0 && landmarks < 2;
   const roadCommercial = /경기(도)?/.test(addr) && /대로/.test(addr) && weakAttraction;
   return kwMatch || roadCommercial;
+}
+
+function detectSuburbanDeadStrip(metrics, address = "") {
+  const addr = String(address || "");
+  if (!/경기(도)?/.test(addr)) return false;
+  const keywords = CONFIG.SCORING?.SUBURBAN_KEYWORDS || [];
+  if (!keywords.some(k => addr.includes(k)) && !/대로/.test(addr)) return false;
+  const hnb1 = metrics?.hnb1km || 0;
+  const hnb2 = metrics?.hnb2km || 0;
+  const subwayDist = Number(metrics?.subwayDistM);
+  const weakLocalRetail = hnb1 < 2 && hnb2 < 6;
+  const farTransit = !subwayDist || subwayDist > 700;
+  return weakLocalRetail && farTransit;
 }
 
 function applyFootTrafficScoreCap(composite, foot, cfg) {
@@ -1372,6 +1405,24 @@ function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
   const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
 
   if (zone === "soft_corridor") {
+    const beautyRetail = detectCorridorBeautyRetail({ ...metrics, districtZone: zone });
+    if (beautyRetail) {
+      let s = 0;
+      if (subwayNear) s += 0.22;
+      else if (subwayWalk) s += 0.14;
+      else if (subwayDist != null && Number(subwayDist) <= 1500) s += 0.06;
+      if (tourismPoi >= 2) s += 0.1;
+      if (tourismPoi >= 4) s += 0.08;
+      if (landmarkCount >= 2) s += 0.1;
+      if (landmarkCount >= 4) s += 0.04;
+      if (deptCount > 0) s += 0.08;
+      if (hnb2 >= 6) s += 0.18;
+      else if (hnb2 >= 4) s += 0.12;
+      const hospitalDist = metrics?.hospitalDistM;
+      if (hospitalDist != null && Number(hospitalDist) <= 800) s += 0.05;
+      const cap = trafficCfg.SOFT_CORRIDOR_BEAUTY_FOOT_CAP || 0.62;
+      return clamp01(Math.min(s, cap));
+    }
     let s = 0;
     if (subwayNear) s += 0.08;
     else if (subwayWalk) s += 0.04;
@@ -1383,23 +1434,28 @@ function computeFootTrafficProxy(traffic, landmarks, metrics, address = "") {
     const hospitalDist = metrics?.hospitalDistM;
     if (hospitalDist != null && Number(hospitalDist) <= 600) s += 0.06;
     else if (hospitalDist != null && Number(hospitalDist) <= 1200) s += 0.035;
-    const beautyRetail = detectCorridorBeautyRetail({ ...metrics, districtZone: zone });
     if (detectCorridorStagnation({ ...metrics, districtZone: zone })) s *= 0.68;
-    else if (hnb2 >= 5 && tourismPoi < 3) s *= beautyRetail ? 0.9 : 0.8;
+    else if (hnb2 >= 5 && tourismPoi < 3) s *= 0.8;
     const cap = trafficCfg.SOFT_CORRIDOR_FOOT_CAP || 0.4;
     return clamp01(Math.min(s, cap));
   }
 
   if (zone === "suburban" || detectSuburbanStrip(metrics, address)) {
+    const hnb1 = metrics?.hnb1km || 0;
+    if (detectSuburbanDeadStrip(metrics, address)) {
+      let s = 0;
+      if (subwayNear) s += 0.03;
+      else if (subwayWalk) s += 0.02;
+      return clamp01(Math.min(s, trafficCfg.SUBURBAN_DEAD_STRIP_FOOT_CAP || 0.16));
+    }
     let s = 0;
     if (subwayNear) s += 0.05;
-    else if (subwayWalk) s += 0.02;
-    if (tourismPoi >= 2) s += 0.07;
-    if (tourismPoi >= 4) s += 0.06;
-    if (deptCount > 0) s += 0.08;
-    if (landmarkCount >= 2) s += 0.04;
-    s += computeCommercialClusterBoost(metrics) * 0.55;
-    return clamp01(Math.min(s, trafficCfg.SUBURBAN_FOOT_CAP || 0.32));
+    else if (subwayWalk) s += 0.03;
+    else if (subwayDist != null && Number(subwayDist) <= 1200) s += 0.01;
+    if (hnb1 >= 3) s += 0.06;
+    else if (hnb1 >= 1) s += 0.03;
+    s += computeCommercialClusterBoost(metrics) * 0.2;
+    return clamp01(Math.min(s, trafficCfg.SUBURBAN_FOOT_CAP || 0.22));
   }
 
   if (zone === "regional_urban") {
@@ -1559,9 +1615,14 @@ function computeMarketVitality({ address, metrics, traffic, competition, demand 
   else if (zone === "soft_corridor") {
     if (subwayNear) v -= 0.04;
     if (detectCorridorStagnation(m)) v *= 0.72;
+    const beautyRetail = detectCorridorBeautyRetail(m);
+    const hnb2 = m.hnb2km || 0;
+    if (beautyRetail && hnb2 >= 4) v += 0.08;
     const cap = detectCorridorStagnation(m)
       ? (compCfg.SOFT_CORRIDOR_STRICT_CAP || 0.28)
-      : (compCfg.SOFT_CORRIDOR_VITALITY_CAP || 0.34);
+      : beautyRetail
+        ? (compCfg.SOFT_CORRIDOR_BEAUTY_VITALITY_CAP || 0.52)
+        : (compCfg.SOFT_CORRIDOR_VITALITY_CAP || 0.34);
     v = Math.min(v, cap);
   } else if (zone === "suburban" || m.suburbanStrip) {
     v = Math.min(v + computeCommercialClusterBoost(m) * 0.35, 0.36);
@@ -1646,9 +1707,10 @@ function scoreCompetitionV2(competition, max, marketContext) {
   const vitality = marketContext?.vitality || 0;
   const isPremiumHub = marketContext?.isPremiumHub || false;
 
-  const whThreat1 = warehouseThreat(c1.warehouseStores);
-  const whThreat2 = Math.max(0, warehouseThreat(c2.warehouseStores) - whThreat1 * 0.65);
-  const whThreat5 = Math.max(0, warehouseThreat(c5.warehouseStores) - whThreat2 * 0.5);
+  const whScale = warehouseThreatScale(marketContext);
+  const whThreat1 = warehouseThreat(c1.warehouseStores) * whScale;
+  const whThreat2 = Math.max(0, warehouseThreat(c2.warehouseStores) * whScale - whThreat1 * 0.65);
+  const whThreat5 = Math.max(0, warehouseThreat(c5.warehouseStores) * whScale - whThreat2 * 0.5);
 
   let s = 1.0;
   s -= Math.min(0.48, whThreat1 * 0.42);
@@ -1673,6 +1735,11 @@ function scoreCompetitionV2(competition, max, marketContext) {
   if (isPremiumHub && whThreat1 < 0.55) {
     const floor = (compCfg.PREMIUM_SCORE_FLOOR || 0.48) + vitality * (compCfg.PREMIUM_SCORE_FLOOR_BOOST || 0.32);
     s = Math.max(s, floor);
+  }
+
+  const beautyRetail = detectCorridorBeautyRetail(marketContext?.metrics || {});
+  if (beautyRetail && whThreat1 < 0.45) {
+    s = Math.max(s, 0.72);
   }
 
   const hospDist = marketContext?.metrics?.hospitalDistM;
@@ -1737,6 +1804,7 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
       + scoreHospitalDemandBoost(trafficMetrics) * 0.7
     );
     if (foot < 0.26 && hnb2 < 3) composite = clamp01(composite * 0.86);
+    if (trafficMetrics?.suburbanDeadStrip) composite = clamp01(composite * 0.78);
   } else if (zone === "regional_urban") {
     const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
     const hhW = trafficCfg.REGIONAL_URBAN_DEMAND_HH_WEIGHT || 0.38;
@@ -1751,6 +1819,10 @@ function scoreDemandV2(demand, max, typeFactor, trafficMetrics) {
       hh * 0.4 + age * 0.27 + apt * 0.21 + beautyDemand + subwayBoost + 0.08
       + scoreHospitalDemandBoost(trafficMetrics)
     );
+  }
+
+  if (isFranchiseStoreModel() && (zone === "suburban" || trafficMetrics?.suburbanStrip)) {
+    composite = clamp01(composite + 0.05);
   }
 
   return Math.round(composite * typeFactor * max);
@@ -1781,7 +1853,7 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
     : (cfg.HOSPITAL_TRAFFIC_WEIGHT_URBAN || 0.11);
 
   const accessScale = zone === "mega_hub" || zone === "premium" ? 1
-    : zone === "soft_corridor" ? (detectCorridorBeautyRetail(m) ? 0.68 : 0.58)
+    : zone === "soft_corridor" ? (detectCorridorBeautyRetail(m) ? 0.78 : 0.58)
     : suburban ? 0.32
     : regionalUrban ? 0.38
     : foot < 0.35 ? 0.45
@@ -1805,10 +1877,16 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
 
   if (zone === "soft_corridor") {
     if (stagnant) composite *= 0.86;
-    composite = Math.min(composite, cfg.SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP || 0.64);
+    const beautyCap = m.corridorBeautyRetail
+      ? (cfg.SOFT_CORRIDOR_BEAUTY_TRAFFIC_CAP || 0.78)
+      : (cfg.SOFT_CORRIDOR_TRAFFIC_COMPOSITE_CAP || 0.64);
+    composite = Math.min(composite, beautyCap);
   }
   if (suburban) {
-    composite = Math.min(composite, cfg.SUBURBAN_TRAFFIC_CAP || 0.48);
+    const deadCap = m.suburbanDeadStrip
+      ? (cfg.SUBURBAN_DEAD_STRIP_TRAFFIC_CAP || 0.36)
+      : (cfg.SUBURBAN_TRAFFIC_CAP || 0.42);
+    composite = Math.min(composite, deadCap);
   }
   if (regionalUrban) {
     composite = Math.min(composite, cfg.REGIONAL_URBAN_TRAFFIC_CAP || 0.44);
@@ -1821,47 +1899,83 @@ function scoreTrafficV2(traffic, landmarks, max, metrics) {
   return Math.round(composite * max);
 }
 
-function scoreEconomicsV2(price, max, buildingType, trafficMetrics) {
-  const rent = price.rentPerPy;
-  const sale = price.salePerPy;
-  const deals = price.deals12mo || 0;
+function inferConservativeRentPy(trafficMetrics, price, buildingType) {
   const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
-
-  if (rent == null || rent <= 0) {
-    if (sale > 0 && deals > 0) {
-      const ratio = CONFIG.RENT_SALE_RATIO?.[buildingType] || 240;
-      const impliedRent = sale / ratio;
-      const r = impliedRent / benchmark;
-      const partial = r <= 1 ? 0.72 : r <= 1.4 ? 0.58 : 0.42;
-      return Math.round(partial * max);
-    }
-    return Math.round(max * 0.42);
+  const sale = price?.salePerPy;
+  if (sale > 0) {
+    const ratio = CONFIG.RENT_SALE_RATIO?.[buildingType] || 240;
+    return Math.max(benchmark, Math.round(sale / ratio));
   }
-
-  const ratio = rent / benchmark;
-  let s;
-  if (ratio <= 0.85) s = 1;
-  else if (ratio <= 1) s = 0.95;
-  else if (ratio <= 1.2) s = 0.82;
-  else if (ratio <= 1.45) s = 0.65;
-  else if (ratio <= 1.8) s = 0.45;
-  else if (ratio <= 2.2) s = 0.28;
-  else s = 0.18;
-
-  if (deals >= 3) s = Math.min(1, s + 0.06);
-  else if (deals === 0) s *= 0.88;
-
-  let result = Math.round(s * max);
+  const mults = CONFIG.SCORING?.DIRECT_ECONOMICS?.CONSERVATIVE_RENT_MULT || {};
   const zone = trafficMetrics?.districtZone || "general";
-  const foot = trafficMetrics?.footTrafficProxy || 0;
-  const hnb2 = trafficMetrics?.hnb2km || 0;
-  if ((zone === "suburban" || trafficMetrics?.suburbanStrip) && foot < 0.28 && hnb2 < 4) {
-    result = Math.round(result * 0.84);
+  if (zone === "soft_corridor" && trafficMetrics?.corridorBeautyRetail) {
+    return benchmark * (mults.soft_corridor_beauty || 4.5);
   }
-  if (zone === "regional_urban" && foot < 0.3) {
-    result = Math.round(result * 0.9);
-  }
-  return result;
+  if (zone === "mega_hub") return benchmark * (mults.mega_hub || 4);
+  if (zone === "premium") return benchmark * (mults.premium || 3.5);
+  return benchmark * (mults.default || 1.1);
+}
+
+function computeDirectStoreUnitEconomics(areaPy, trafficMetrics, price, buildingType) {
+  const unit = computeFranchiseUnitEconomics(areaPy, trafficMetrics, price, buildingType);
+  const rentPy = price?.rentPerPy > 0
+    ? price.rentPerPy
+    : inferConservativeRentPy(trafficMetrics, price, buildingType);
+  const monthlyRent = rentPy * unit.areaPy;
+  const monthlyNet = unit.monthlyOpProfit - monthlyRent;
+  const breakevenRentPy = unit.monthlyOpProfit / unit.areaPy;
+  return {
+    ...unit,
+    rentPy,
+    rentEstimated: !(price?.rentPerPy > 0),
+    monthlyRent: Math.round(monthlyRent),
+    monthlyNet: Math.round(monthlyNet),
+    netPerPy: Math.round((monthlyNet / unit.areaPy) * 10) / 10,
+    breakevenRentPy: Math.round(breakevenRentPy * 10) / 10,
+    netToRentRatio: monthlyRent > 0 ? Math.round((monthlyNet / monthlyRent) * 100) / 100 : null
+  };
+}
+
+function scoreDirectNetMargin(econ) {
+  const net = econ?.monthlyNet;
+  const rent = econ?.monthlyRent;
+  if (net == null || !rent || rent <= 0) return 0.45;
+  const ratio = net / rent;
+  if (ratio >= 0.35) return 0.96;
+  if (ratio >= 0.15) return 0.82;
+  if (ratio >= 0) return 0.66;
+  if (ratio >= -0.25) return 0.4;
+  if (ratio >= -0.55) return 0.18;
+  return 0.06;
+}
+
+function scoreEconomicsV2(price, max, buildingType, trafficMetrics, building) {
+  const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
+  const cfg = CONFIG.SCORING?.DIRECT_ECONOMICS || {};
+  const areaPy = getEffectiveLeaseAreaPy(building || {});
+  const econ = computeDirectStoreUnitEconomics(areaPy, trafficMetrics, price, buildingType);
+  const rentRatio = econ.rentPy / benchmark;
+
+  let rentScore;
+  if (rentRatio <= 0.85) rentScore = 1;
+  else if (rentRatio <= 1) rentScore = 0.92;
+  else if (rentRatio <= 1.2) rentScore = 0.78;
+  else if (rentRatio <= 1.45) rentScore = 0.58;
+  else if (rentRatio <= 1.8) rentScore = 0.38;
+  else if (rentRatio <= 2.2) rentScore = 0.22;
+  else if (rentRatio <= 3.5) rentScore = 0.12;
+  else if (rentRatio <= 5) rentScore = 0.07;
+  else rentScore = 0.04;
+
+  const deals = price?.deals12mo || 0;
+  if (deals >= 3) rentScore = Math.min(1, rentScore + 0.04);
+  else if (deals === 0) rentScore *= 0.9;
+
+  const netScore = scoreDirectNetMargin(econ);
+  const composite = clamp01(
+    netScore * (cfg.NET_PROFIT_WEIGHT || 0.65) + rentScore * (cfg.RENT_RATIO_WEIGHT || 0.35)
+  );
+  return Math.round(composite * max);
 }
 
 function getEffectiveLeaseAreaPy(building) {
@@ -1910,7 +2024,7 @@ function computeLocationSalesMultiplier(trafficMetrics) {
   return mult;
 }
 
-function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
+function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price, buildingType = "근린상가") {
   const cfg = CONFIG.FRANCHISE_ECONOMICS || {};
   const refPy = cfg.REF_AREA_PY || 180;
   const py = Math.max(cfg.MIN_AREA_PY || 100, toNumber(areaPy) || refPy);
@@ -1932,7 +2046,9 @@ function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
 
   const salesPerPy = monthlySales / py;
   const opProfitPerPy = monthlyOpProfit / py;
-  const marketRentPy = price?.rentPerPy > 0 ? price.rentPerPy : CONFIG.BENCHMARK_RENT_PER_PY;
+  const marketRentPy = price?.rentPerPy > 0
+    ? price.rentPerPy
+    : inferConservativeRentPy(trafficMetrics, price, buildingType);
   const rentComparePy = Math.max(marketRentPy, cfg.MIN_RENT_COMPARE_PY || 6);
   const leasingIncomeActual = marketRentPy * py;
   const leasingIncome = rentComparePy * py;
@@ -1962,7 +2078,9 @@ function computeFranchiseUnitEconomics(areaPy, trafficMetrics, price) {
     profitVsRentRatioNormal: profitVsRentRatio != null
       ? Math.round(profitVsRentRatio * normalUplift * 100) / 100
       : null,
-    marketRentSource: price?.rentPerPy > 0 ? (price.rentSource || "인근 시세 추정") : "본사 기준 임대(9만원/평) 참고"
+    marketRentSource: price?.rentPerPy > 0
+      ? (price.rentSource || "인근 시세 추정")
+      : "상권·실거래 기반 보수 추정"
   };
 }
 
@@ -2049,40 +2167,72 @@ function scoreFranchiseViabilityV2(price, max, buildingType, trafficMetrics, dem
     if (r >= sweetMin && r <= sweetMax) leasingBand = 0.84;
     else if (r < sweetMin) leasingBand = 0.68;
     else if (r <= 1.85) leasingBand = 0.6;
-    else leasingBand = foot >= 0.32 ? 0.58 : 0.44;
+    else leasingBand = foot >= 0.32 ? 0.5 : 0.42;
   } else if (sale > 0 && deals > 0) {
     leasingBand = 0.64;
   }
-
-  if (rent != null && rent > benchmark * 1.35 && foot >= 0.34) leasingBand += 0.08;
 
   const c2 = competition?.["2km"] || competition?.["1km"] || {};
   const wh2 = c2.warehouse || 0;
   const compGap = wh2 === 0 ? 0.07 : wh2 === 1 ? 0.02 : -0.05;
 
-  const bizViabilityRaw = clamp01(
-    vitality * 0.32 + foot * 0.26 + hh * 0.1
-    + (hnb2 >= 3 && hnb2 <= 18 ? 0.12 : hnb2 >= 1 ? 0.04 : 0)
-    + scoreHospitalDemandBoost(trafficMetrics) * 2
-    + (detectHNBColocationStrategy(trafficMetrics) ? 0.1 : 0)
-  );
   const zone = trafficMetrics?.districtZone || "general";
+  const areaPy = getEffectiveLeaseAreaPy(building);
+  let bizViabilityRaw;
+  if (zone === "suburban") {
+    bizViabilityRaw = clamp01(
+      hh * 0.28 + foot * 0.08 + vitality * 0.1
+      + (hnb2 >= 2 && hnb2 <= 12 ? 0.06 : 0.02)
+      + scoreHospitalDemandBoost(trafficMetrics) * 0.85
+      + (areaPy >= (cfg.LARGE_FLOOR_BONUS_PY_MIN || 200) ? 0.06 : 0.02)
+    );
+  } else {
+    bizViabilityRaw = clamp01(
+      vitality * 0.32 + foot * 0.26 + hh * 0.1
+      + (hnb2 >= 3 && hnb2 <= 18 ? 0.12 : hnb2 >= 1 ? 0.04 : 0)
+      + scoreHospitalDemandBoost(trafficMetrics) * 2
+      + (detectHNBColocationStrategy(trafficMetrics) ? 0.1 : 0)
+    );
+  }
   let bizViability = bizViabilityRaw;
   if (zone === "regional_urban") {
     bizViability *= foot >= 0.28 ? 0.88 : 0.82;
     if (foot < 0.26) bizViability = Math.min(bizViability, 0.52);
   }
 
-  const areaPy = getEffectiveLeaseAreaPy(building);
-  const unitEcon = computeFranchiseUnitEconomics(areaPy, trafficMetrics, price);
+  const unitEcon = computeFranchiseUnitEconomics(areaPy, trafficMetrics, price, building?.type);
   const profitVsRent = scoreFranchiseProfitVsRent(unitEcon);
+
+  if (zone === "suburban" && unitEcon.profitVsRentRatio >= 0.88) {
+    bizViability = clamp01(bizViability + (cfg.SUBURBAN_LANDLORD_BONUS || 0.06));
+  }
+
+  if (rent != null && rent > benchmark * 1.35 && unitEcon.profitVsRentRatio < 0.85) {
+    leasingBand = Math.max(0.28, leasingBand - 0.1);
+  }
+
   const idealMin = CONFIG.FRANCHISE_ECONOMICS?.IDEAL_AREA_MIN || 150;
   const idealMax = CONFIG.FRANCHISE_ECONOMICS?.IDEAL_AREA_MAX || 220;
-  const areaFit = areaPy >= idealMin && areaPy <= idealMax ? 0.06 : areaPy >= 120 ? 0.02 : -0.04;
+  let areaFit = areaPy >= idealMin && areaPy <= idealMax ? 0.06 : areaPy >= 120 ? 0.02 : -0.04;
+  if (zone === "suburban" && areaPy >= (cfg.LARGE_FLOOR_BONUS_PY_MIN || 200)) {
+    areaFit = Math.max(areaFit, 0.05);
+  }
 
-  const composite = clamp01(
-    profitVsRent * 0.42 + bizViability * 0.28 + marketActivity * 0.14 + leasingBand * 0.1 + compGap + areaFit + 0.06
+  const profitW = cfg.PROFIT_VS_RENT_WEIGHT || 0.55;
+  const bizW = cfg.BIZ_VIABILITY_WEIGHT || 0.22;
+  const marketW = cfg.MARKET_ACTIVITY_WEIGHT || 0.12;
+  const leaseW = cfg.LEASING_BAND_WEIGHT || 0.06;
+
+  let composite = clamp01(
+    profitVsRent * profitW + bizViability * bizW + marketActivity * marketW
+    + leasingBand * leaseW + compGap + areaFit + 0.06
   );
+
+  const weakCap = cfg.OP_RATIO_WEAK_CAP || 0.72;
+  if (unitEcon.profitVsRentRatio != null && unitEcon.profitVsRentRatio < weakCap) {
+    composite = Math.min(composite, 0.58 + unitEcon.profitVsRentRatio * 0.22);
+  }
+
   return {
     score: Math.round(composite * max),
     unitEcon
@@ -2145,6 +2295,15 @@ function applyScoreVetoes(total, blockers, vetoCfg) {
   if (blockers.includes("no_parking") && vetoCfg.NO_PARKING_MAX_TOTAL) {
     capped = Math.min(capped, vetoCfg.NO_PARKING_MAX_TOTAL);
   }
+  if (blockers.includes("rent_prohibitive") && vetoCfg.RENT_5X_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.RENT_5X_MAX_TOTAL);
+  }
+  if (blockers.includes("rent_extreme") && vetoCfg.RENT_3X_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.RENT_3X_MAX_TOTAL);
+  }
+  if (blockers.includes("rent_unaffordable") && vetoCfg.RENT_UNAFFORDABLE_MAX_TOTAL) {
+    capped = Math.min(capped, vetoCfg.RENT_UNAFFORDABLE_MAX_TOTAL);
+  }
   if (blockers.includes("rent_high") && vetoCfg.RENT_2X_MAX_TOTAL) {
     capped = Math.min(capped, vetoCfg.RENT_2X_MAX_TOTAL);
   }
@@ -2170,17 +2329,53 @@ function gradeOfV2(total) {
 function collectScoreBlockers(data) {
   const blockers = [];
   const c1 = data.competition?.["1km"] || {};
+  const c2 = data.competition?.["2km"] || {};
   const b = data.building || {};
   const rent = data.price?.rentPerPy;
   const benchmark = CONFIG.BENCHMARK_RENT_PER_PY;
+  const compCfg = CONFIG.SCORING?.COMPETITION || {};
 
-  if ((c1.warehouse || 0) > 0 || warehouseThreat(c1.warehouseStores) >= 0.75) {
-    blockers.push("warehouse_1km");
-  }
   const metrics = data.traffic?.metrics || {};
   metrics.hnb2km = metrics.hnb2km || data.competition?.["2km"]?.hnb || 0;
+  const vitality = metrics.marketVitality || 0;
+  const whScale = warehouseThreatScale({
+    metrics,
+    vitality,
+    address: data.address,
+    isPremiumHub: isPremiumCommercialHub({
+      vitality,
+      zone: metrics.districtZone,
+      metrics,
+      competition: data.competition,
+      compCfg
+    })
+  });
+  const wh1Raw = warehouseThreat(c1.warehouseStores);
+  const wh1Effective = wh1Raw * whScale;
+  const wh1Count = c1.warehouse || 0;
+  const beautyRetail = detectCorridorBeautyRetail(metrics);
+  const minThreat = compCfg.WAREHOUSE_VETO_MIN_THREAT || 0.55;
+  const skipWarehouseVeto = (beautyRetail && wh1Count <= 1 && (c2.warehouse || 0) <= 2)
+    || (vitality >= 0.45 && metrics.hnb2km >= 6 && wh1Count <= 1);
+
+  if (!skipWarehouseVeto && (wh1Count > 0 || wh1Raw >= 0.75) && wh1Effective >= minThreat) {
+    blockers.push("warehouse_1km");
+  }
   if (!hasParking(b) && !detectHNBColocationStrategy(metrics)) blockers.push("no_parking");
-  if (!isFranchiseStoreModel() && rent != null && rent > benchmark * 2) blockers.push("rent_high");
+
+  if (!isFranchiseStoreModel()) {
+    const directEcon = data.directUnitEcon || computeDirectStoreUnitEconomics(
+      getEffectiveLeaseAreaPy(b),
+      metrics,
+      data.price,
+      b.type
+    );
+    const rentRatio = directEcon.rentPy / benchmark;
+    if (directEcon.monthlyNet < 0) blockers.push("rent_unaffordable");
+    if (rentRatio > 5) blockers.push("rent_prohibitive");
+    else if (rentRatio > 3) blockers.push("rent_extreme");
+    else if (rentRatio > 2) blockers.push("rent_high");
+  }
   const leasePy = getEnteredLeaseAreaPy();
   if (leasePy > 0 && leasePy < (CONFIG.SCORING?.PHYSICAL?.AREA_FLOOR_PY || 120)) {
     blockers.push("area_small");
@@ -2212,6 +2407,7 @@ function computeFullScore(data) {
     m.corridorBeautyRetail = detectCorridorBeautyRetail(m);
     m.commercialCorridor = isUrbanCommercialCorridor(data.address);
     m.suburbanStrip = detectSuburbanStrip(m, data.address);
+    m.suburbanDeadStrip = detectSuburbanDeadStrip(m, data.address);
   }
 
   const vitality = computeMarketVitality({
@@ -2258,7 +2454,7 @@ function computeFullScore(data) {
     competition: scoreCompetitionV2(data.competition, W.competition, marketContext),
     economics: (() => {
       if (!isFranchiseStoreModel()) {
-        return scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics);
+        return scoreEconomicsV2(data.price, W.economics, b.type, data.traffic?.metrics, b);
       }
       const fr = scoreFranchiseViabilityV2(
         data.price, W.economics, b.type, data.traffic?.metrics, data.demand, data.competition, b
@@ -2268,8 +2464,18 @@ function computeFullScore(data) {
     physical: scorePhysicalV2(b, W.physical, data.traffic?.metrics)
   };
 
+  const directUnitEcon = !isFranchiseStoreModel()
+    ? computeDirectStoreUnitEconomics(
+      getEffectiveLeaseAreaPy(b),
+      data.traffic?.metrics,
+      data.price,
+      b.type
+    )
+    : null;
+  data.directUnitEcon = directUnitEcon;
+
   const franchiseUnitEcon = isFranchiseStoreModel()
-    ? computeFranchiseUnitEconomics(getEffectiveLeaseAreaPy(b), data.traffic?.metrics, data.price)
+    ? computeFranchiseUnitEconomics(getEffectiveLeaseAreaPy(b), data.traffic?.metrics, data.price, b.type)
     : null;
 
   let total = Object.values(sc).reduce((a, v) => a + v, 0);
@@ -2280,17 +2486,28 @@ function computeFullScore(data) {
     const synergyMax = compCfg.SYNERGY_BONUS_MAX || 4;
     const trafficOk = sc.traffic >= W.traffic * 0.6;
     const demandOk = sc.demand >= W.demand * 0.5;
-    if (trafficOk && demandOk) {
+    const econOk = isFranchiseStoreModel() || sc.economics >= W.economics * 0.42;
+    if (trafficOk && demandOk && econOk) {
       total += Math.round(vitality * synergyMax);
     }
   }
 
   if (detectHNBColocationStrategy(data.traffic?.metrics)) {
-    const hnb2 = data.traffic?.metrics?.hnb2km || 0;
-    const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
-    const stratMax = trafficCfg.HNB_COLOCATION_SYNERGY_MAX || 7;
-    const beautyExtra = data.traffic?.metrics?.corridorBeautyRetail ? 2 : 0;
-    total += Math.min(stratMax, Math.round((hnb2 / 16) * stratMax) + beautyExtra);
+    const econOk = isFranchiseStoreModel()
+      ? sc.economics >= W.economics * 0.68
+      : sc.economics >= W.economics * 0.42;
+    if (econOk) {
+      const hnb2 = data.traffic?.metrics?.hnb2km || 0;
+      const trafficCfg = CONFIG.SCORING?.TRAFFIC || {};
+      const stratMax = trafficCfg.HNB_COLOCATION_SYNERGY_MAX || 7;
+      const beautyExtra = data.traffic?.metrics?.corridorBeautyRetail ? 2 : 0;
+      total += Math.min(stratMax, Math.round((hnb2 / 16) * stratMax) + beautyExtra);
+    }
+  }
+
+  if (isFranchiseStoreModel() && franchiseUnitEcon?.profitVsRentRatio != null
+    && franchiseUnitEcon.profitVsRentRatio < 0.8) {
+    total = Math.min(total, vetoCfg.FRANCHISE_WEAK_OP_MAX_TOTAL || 78);
   }
 
   const blockers = collectScoreBlockers(data);
@@ -2313,6 +2530,7 @@ function computeFullScore(data) {
     districtZone: data.traffic?.metrics?.districtZone || "general",
     storeModel: isFranchiseStoreModel() ? "franchise" : "direct",
     franchiseUnitEcon,
+    directUnitEcon,
     leaseAreaPy: getEffectiveLeaseAreaPy(b)
   };
 }
@@ -2324,6 +2542,8 @@ const $ = id => document.getElementById(id);
 let currentRadius = "5km";
 let DATA = JSON.parse(JSON.stringify(EMPTY));
 const RECENT_SEARCH_KEY = "ps_recent_addresses";
+const RECENT_SEARCH_MAX = 8;
+let recentSearchesCache = [];
 const PROGRESS_STEPS = [
   { id: "sdk", weight: 5 },
   { id: "geocode", weight: 7 },
@@ -2401,11 +2621,88 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
-function loadRecentSearches() {
+function loadRecentSearchesFromLocalStorage() {
   try {
     return JSON.parse(localStorage.getItem(RECENT_SEARCH_KEY) || "[]");
   } catch {
     return [];
+  }
+}
+
+function getRecentSearchAuthParams() {
+  const code = String(CONFIG.ACCESS_CODE || "").trim();
+  return code ? { code } : {};
+}
+
+async function callRecentSearchesApi(method, body = null) {
+  const params = new URLSearchParams(getRecentSearchAuthParams());
+  const url = `/.netlify/functions/recent-searches?${params}`;
+  const opts = { method };
+  if (body != null) {
+    opts.method = "POST";
+    opts.headers = { "Content-Type": "application/json" };
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  let data;
+  try {
+    data = await res.json();
+  } catch {
+    throw new Error(`최근 검색: 응답 파싱 실패 (HTTP ${res.status})`);
+  }
+  if (!res.ok || data.ok === false) {
+    throw new Error(data.message || `최근 검색: HTTP ${res.status}`);
+  }
+  return data;
+}
+
+function dedupeRecentEntries(list) {
+  const out = [];
+  const seen = new Set();
+  for (const raw of list || []) {
+    const entry = normalizeRecentEntry(raw);
+    if (!entry.addr || seen.has(entry.addrKey)) continue;
+    seen.add(entry.addrKey);
+    out.push(entry);
+    if (out.length >= RECENT_SEARCH_MAX) break;
+  }
+  return out;
+}
+
+function setRecentSearchesCache(items) {
+  recentSearchesCache = dedupeRecentEntries(items);
+}
+
+function loadRecentSearches() {
+  return recentSearchesCache.map(normalizeRecentEntry);
+}
+
+async function refreshRecentSearchesFromServer() {
+  const data = await callRecentSearchesApi("GET");
+  setRecentSearchesCache(data.items || []);
+  renderRecentSearches();
+}
+
+async function migrateLocalRecentSearchesToServer() {
+  const local = loadRecentSearchesFromLocalStorage()
+    .map(normalizeRecentEntry)
+    .filter(e => e.addr);
+  if (!local.length) return;
+  try {
+    await callRecentSearchesApi("POST", { action: "replace", items: local });
+    localStorage.removeItem(RECENT_SEARCH_KEY);
+  } catch (error) {
+    console.warn("최근 검색 로컬 이전 실패:", error);
+  }
+}
+
+async function initRecentSearches() {
+  try {
+    await migrateLocalRecentSearchesToServer();
+    await refreshRecentSearchesFromServer();
+  } catch (error) {
+    console.warn("최근 검색 불러오기 실패:", error);
+    renderRecentSearches();
   }
 }
 
@@ -2438,7 +2735,7 @@ function captureAnalysisInputs() {
   };
 }
 
-function saveRecentSearch(addr) {
+async function saveRecentSearch(addr) {
   const trimmed = String(addr || "").trim();
   if (!trimmed) return;
   const entry = {
@@ -2446,19 +2743,24 @@ function saveRecentSearch(addr) {
     addrKey: normalizeAddrKey(trimmed),
     context: captureAnalysisInputs()
   };
-  const list = loadRecentSearches()
-    .map(normalizeRecentEntry)
-    .filter(e => e.addrKey !== entry.addrKey);
-  list.unshift(entry);
-  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list.slice(0, 8)));
+  try {
+    const data = await callRecentSearchesApi("POST", { action: "save", entry });
+    setRecentSearchesCache(data.items || []);
+  } catch (error) {
+    console.warn("최근 검색 저장 실패:", error);
+    setRecentSearchesCache([entry, ...loadRecentSearches().filter(e => e.addrKey !== entry.addrKey)]);
+  }
   renderRecentSearches();
 }
 
-function removeRecentSearch(addrKey) {
-  const list = loadRecentSearches()
-    .map(normalizeRecentEntry)
-    .filter(e => e.addrKey !== addrKey);
-  localStorage.setItem(RECENT_SEARCH_KEY, JSON.stringify(list));
+async function removeRecentSearch(addrKey) {
+  try {
+    const data = await callRecentSearchesApi("POST", { action: "remove", addrKey });
+    setRecentSearchesCache(data.items || []);
+  } catch (error) {
+    console.warn("최근 검색 삭제 실패:", error);
+    setRecentSearchesCache(loadRecentSearches().filter(e => e.addrKey !== addrKey));
+  }
   renderRecentSearches();
 }
 
@@ -5225,7 +5527,7 @@ if (CONFIG.KAKAO_JS_KEY) {
   $("demoNote").style.display = "none";
   loadKakaoSDK().catch(() => {});
 }
-renderRecentSearches();
+initRecentSearches();
 
 render();
 </script>
